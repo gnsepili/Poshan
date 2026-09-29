@@ -35,7 +35,10 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
     const cap = Number(Deno.env.get('AI_DAILY_CALL_CAP') ?? '50')
-    const { data: allowed } = await supabase.rpc('check_and_increment_ai_usage', { p_user_id: userData.user.id, p_cap: cap })
+    const { data: allowed, error: usageError } = await supabase.rpc('check_and_increment_ai_usage', { p_user_id: userData.user.id, p_cap: cap })
+    if (usageError) {
+      console.error('ai_usage rpc failed (failing open):', usageError.message ?? usageError)
+    }
     if (allowed === false) {
       return new Response(JSON.stringify({ error: "You've reached today's AI limit. It resets at midnight." }), { status: 429, headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
