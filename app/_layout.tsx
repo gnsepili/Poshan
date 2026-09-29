@@ -1,5 +1,7 @@
 import '../global.css'
 import { useEffect, useState } from 'react'
+import { AppState } from 'react-native'
+import NetInfo from '@react-native-community/netinfo'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -7,11 +9,13 @@ import { StatusBar } from 'expo-status-bar'
 import { useAuthStore } from '../stores/authStore'
 import { useProfileStore } from '../stores/profileStore'
 import { usePushStore } from '../stores/pushStore'
+import { useMealsStore } from '../stores/mealsStore'
 
 export default function RootLayout() {
   const { session, user, initialize } = useAuthStore()
   const { profile, fetchProfile } = useProfileStore()
   const { registerForPush } = usePushStore()
+  const { flushQueue, loadPendingCount } = useMealsStore()
   const [authReady, setAuthReady] = useState(false)
   const [profileChecked, setProfileChecked] = useState(false)
   const router = useRouter()
@@ -32,6 +36,21 @@ export default function RootLayout() {
       registerForPush(user.id)
     } else {
       setProfileChecked(false)
+    }
+  }, [session, user])
+
+  useEffect(() => {
+    if (!session || !user) return
+    loadPendingCount()
+    const unsubscribeNet = NetInfo.addEventListener((state) => {
+      if (state.isConnected) flushQueue()
+    })
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') flushQueue()
+    })
+    return () => {
+      unsubscribeNet()
+      sub.remove()
     }
   }, [session, user])
 
