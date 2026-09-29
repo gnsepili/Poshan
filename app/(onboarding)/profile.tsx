@@ -10,7 +10,7 @@ const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'act
 export default function OnboardingProfileScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { upsertProfile, loading } = useProfileStore()
+  const { upsertProfile, loading, error } = useProfileStore()
   const [age, setAge] = useState('')
   const [sex, setSex] = useState<'male' | 'female' | 'other'>('male')
   const [heightCm, setHeightCm] = useState('')
@@ -27,12 +27,15 @@ export default function OnboardingProfileScreen() {
       current_weight_kg: parseFloat(weightKg),
       activity_level: activityLevel,
     })
-    router.push('/(onboarding)/goals')
+    if (useProfileStore.getState().error === null) {
+      router.push('/(onboarding)/goals')
+    }
   }
 
   return (
     <ScrollView className="flex-1 bg-white px-6 pt-12">
       <Text className="text-2xl font-bold mb-6 text-gray-900">Your health profile</Text>
+      {error && <Text className="text-red-500 mb-4">{error}</Text>}
       <Text className="text-gray-600 mb-1">Age</Text>
       <TextInput className="border border-gray-300 rounded-lg px-4 py-3 mb-4" keyboardType="number-pad" value={age} onChangeText={setAge} placeholder="e.g. 28" />
       <Text className="text-gray-600 mb-1">Sex</Text>

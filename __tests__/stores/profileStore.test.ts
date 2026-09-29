@@ -7,9 +7,10 @@ jest.mock('../../lib/supabase', () => ({
 }))
 
 const mockFrom = (data: unknown, error: unknown = null) => {
-  const chain = { select: jest.fn(), upsert: jest.fn(), eq: jest.fn(), single: jest.fn() }
+  const chain = { select: jest.fn(), upsert: jest.fn(), insert: jest.fn(), eq: jest.fn(), single: jest.fn() }
   chain.select.mockReturnValue(chain)
   chain.upsert.mockReturnValue(chain)
+  chain.insert.mockReturnValue(chain)
   chain.eq.mockReturnValue(chain)
   chain.single.mockResolvedValue({ data, error })
   ;(supabase.from as jest.Mock).mockReturnValue(chain)
@@ -46,16 +47,20 @@ describe('profileStore', () => {
     expect(useProfileStore.getState().error).toBeNull()
   })
 
-  it('sets error when upsertGoals fails', async () => {
-    mockFrom(null, { message: 'goals upsert failed' })
+  it('sets error when upsertGoals (insert) fails', async () => {
+    const chain = mockFrom(null, { message: 'goals insert failed' })
     await useProfileStore.getState().upsertGoals({ user_id: 'user-1', daily_calorie_target: 2000 })
-    expect(useProfileStore.getState().error).toBe('goals upsert failed')
+    expect(chain.insert).toHaveBeenCalled()
+    expect(chain.upsert).not.toHaveBeenCalled()
+    expect(useProfileStore.getState().error).toBe('goals insert failed')
   })
 
-  it('sets goals when upsertGoals succeeds', async () => {
+  it('sets goals when upsertGoals (insert) succeeds', async () => {
     const mockGoals = { user_id: 'user-1', daily_calorie_target: 2000 }
-    mockFrom(mockGoals)
+    const chain = mockFrom(mockGoals)
     await useProfileStore.getState().upsertGoals({ user_id: 'user-1', daily_calorie_target: 2000 })
+    expect(chain.insert).toHaveBeenCalled()
+    expect(chain.upsert).not.toHaveBeenCalled()
     expect(useProfileStore.getState().goals).toEqual(mockGoals)
     expect(useProfileStore.getState().error).toBeNull()
   })

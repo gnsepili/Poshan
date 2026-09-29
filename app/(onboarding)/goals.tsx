@@ -7,7 +7,7 @@ import { useProfileStore } from '../../stores/profileStore'
 export default function OnboardingGoalsScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { upsertGoals, loading } = useProfileStore()
+  const { upsertGoals, loading, error } = useProfileStore()
   const [targetWeight, setTargetWeight] = useState('')
   const [calories, setCalories] = useState('')
   const [protein, setProtein] = useState('')
@@ -26,12 +26,15 @@ export default function OnboardingGoalsScreen() {
       daily_fat_g: parseInt(fat, 10),
       daily_steps_target: parseInt(steps, 10),
     })
-    router.push('/(onboarding)/ai-setup')
+    if (useProfileStore.getState().error === null) {
+      router.push('/(onboarding)/ai-setup')
+    }
   }
 
   return (
     <ScrollView className="flex-1 bg-white px-6 pt-12">
       <Text className="text-2xl font-bold mb-6 text-gray-900">Your goals</Text>
+      {error && <Text className="text-red-500 mb-4">{error}</Text>}
       {[
         { label: 'Target weight (kg)', value: targetWeight, setter: setTargetWeight },
         { label: 'Daily calories (kcal)', value: calories, setter: setCalories },

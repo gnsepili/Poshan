@@ -56,7 +56,7 @@ export const useProfileStore = create<ProfileState>()(
       set((s) => { s.loading = true; s.error = null })
       const { data, error } = await supabase
         .from('goals')
-        .upsert(goals as unknown as GoalInsert)
+        .insert(goals as unknown as GoalInsert)
         .select()
         .single()
       set((s) => {
