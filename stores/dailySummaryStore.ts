@@ -9,6 +9,7 @@ type DailySummaryInsert = Database['public']['Tables']['daily_summaries']['Inser
 
 interface DailySummaryState {
   summary: DailySummary | null
+  recent: DailySummary[]
   loading: boolean
   // True once fetchOrCreateToday has settled at least once (success or error) for
   // the current session. Distinguishes "today's row hasn't loaded yet" (summary is
@@ -17,11 +18,13 @@ interface DailySummaryState {
   loaded: boolean
   error: string | null
   fetchOrCreateToday: (userId: string) => Promise<void>
+  fetchRecent: (userId: string) => Promise<void>
 }
 
 export const useDailySummaryStore = create<DailySummaryState>()(
   immer((set) => ({
     summary: null,
+    recent: [],
     loading: false,
     loaded: false,
     error: null,
@@ -107,6 +110,21 @@ export const useDailySummaryStore = create<DailySummaryState>()(
         s.loaded = true
         s.summary = insertError ? null : (created as DailySummary)
         s.error = insertError?.message ?? null
+      })
+    },
+
+    fetchRecent: async (userId) => {
+      set((s) => { s.loading = true; s.error = null })
+      const { data, error } = await supabase
+        .from('daily_summaries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: true })
+        .limit(30)
+      set((s) => {
+        s.loading = false
+        s.recent = error ? [] : (data as DailySummary[])
+        s.error = error?.message ?? null
       })
     },
   }))

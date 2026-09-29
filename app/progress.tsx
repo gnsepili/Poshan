@@ -3,7 +3,10 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-nati
 import { useRouter } from 'expo-router'
 import { useAuthStore } from '../stores/authStore'
 import { useInbodyStore } from '../stores/inbodyStore'
+import { useDailySummaryStore } from '../stores/dailySummaryStore'
 import { LineChart } from '../components/ui/LineChart'
+import { BarChart } from '../components/ui/BarChart'
+import { adherenceSeries } from '../lib/utils/chart'
 import { InBodyReport } from '../types'
 
 // Oldest-first series of a single metric, dropping scans where it was not read.
@@ -18,14 +21,23 @@ export default function ProgressScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
   const { reports, fetchReports, loading, error } = useInbodyStore()
+  const { recent, fetchRecent, error: adherenceError } = useDailySummaryStore()
 
-  useEffect(() => { if (user) fetchReports(user.id) }, [user])
+  useEffect(() => { if (user) { fetchReports(user.id); fetchRecent(user.id) } }, [user])
 
   const charts: { title: string; color: string; data: { label: string; value: number }[] }[] = [
     { title: 'Weight (kg)', color: '#16a34a', data: series(reports, 'weight_kg') },
     { title: 'Body fat (%)', color: '#dc2626', data: series(reports, 'body_fat_pct') },
     { title: 'Muscle mass (kg)', color: '#2563eb', data: series(reports, 'muscle_mass_kg') },
   ]
+
+  const adherence = adherenceSeries(
+    recent.map((r) => ({
+      date: r.date,
+      total_calories_consumed: r.total_calories_consumed,
+      ai_daily_goals: r.ai_daily_goals ? { calories: r.ai_daily_goals.calories } : null,
+    }))
+  )
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
@@ -35,6 +47,7 @@ export default function ProgressScreen() {
       </View>
 
       {error && <Text className="text-red-500 mx-6 mt-4">{error}</Text>}
+      {adherenceError && <Text className="text-red-500 mx-6 mt-4">{adherenceError}</Text>}
       {loading && <ActivityIndicator className="mt-8" color="#16a34a" />}
 
       {!loading && reports.length < 2 ? (
@@ -52,6 +65,10 @@ export default function ProgressScreen() {
               <LineChart data={c.data} color={c.color} />
             </View>
           ))}
+          <View className="bg-white rounded-xl p-4 mb-4 border border-gray-100">
+            <Text className="font-semibold text-gray-700 mb-2">Calorie adherence (last 30 days)</Text>
+            <BarChart data={adherence} />
+          </View>
         </View>
       )}
     </ScrollView>

@@ -20,3 +20,23 @@ export function scalePoints(values: number[], width: number, height: number, pad
     return { x, y }
   })
 }
+
+export interface AdherenceBar {
+  label: string
+  consumed: number
+  target: number
+  pct: number
+}
+
+// Calorie adherence per day. A day with no target (missing/null ai_daily_goals or
+// target 0) yields pct 0 rather than NaN/Infinity, so the bar chart never breaks.
+export function adherenceSeries(
+  rows: { date: string; total_calories_consumed: number; ai_daily_goals: { calories?: number } | null }[]
+): AdherenceBar[] {
+  return rows.map((r) => {
+    const target = r.ai_daily_goals?.calories ?? 0
+    const consumed = r.total_calories_consumed ?? 0
+    const pct = target > 0 ? Math.round((consumed / target) * 100) : 0
+    return { label: r.date.slice(5), consumed, target, pct }
+  })
+}

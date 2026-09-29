@@ -18,7 +18,7 @@ function makeSummaryLookupChain(resolved: Resolved) {
 
 describe('dailySummaryStore', () => {
   beforeEach(() => {
-    useDailySummaryStore.setState({ summary: null, loading: false, loaded: false, error: null })
+    useDailySummaryStore.setState({ summary: null, recent: [], loading: false, loaded: false, error: null })
     jest.clearAllMocks()
   })
 
@@ -114,5 +114,32 @@ describe('dailySummaryStore', () => {
     expect(useDailySummaryStore.getState().summary).toEqual(created)
     expect(useDailySummaryStore.getState().error).toBeNull()
     expect(useDailySummaryStore.getState().loaded).toBe(true)
+  })
+
+  it('fetchRecent loads the recent summaries ascending', async () => {
+    const rows = [{ id: 's1', date: '2026-09-01' }, { id: 's2', date: '2026-09-02' }]
+    const chain = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn() }
+    chain.select.mockReturnValue(chain)
+    chain.eq.mockReturnValue(chain)
+    chain.order.mockReturnValue(chain)
+    chain.limit.mockResolvedValue({ data: rows, error: null })
+    ;(supabase.from as jest.Mock).mockImplementation(() => chain)
+
+    await useDailySummaryStore.getState().fetchRecent('user-1')
+    expect(useDailySummaryStore.getState().recent).toHaveLength(2)
+    expect(useDailySummaryStore.getState().error).toBeNull()
+  })
+
+  it('fetchRecent surfaces an error and leaves recent empty', async () => {
+    const chain = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn() }
+    chain.select.mockReturnValue(chain)
+    chain.eq.mockReturnValue(chain)
+    chain.order.mockReturnValue(chain)
+    chain.limit.mockResolvedValue({ data: null, error: { message: 'recent failed' } })
+    ;(supabase.from as jest.Mock).mockImplementation(() => chain)
+
+    await useDailySummaryStore.getState().fetchRecent('user-1')
+    expect(useDailySummaryStore.getState().recent).toEqual([])
+    expect(useDailySummaryStore.getState().error).toBe('recent failed')
   })
 })
