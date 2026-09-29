@@ -1,8 +1,10 @@
 import { resetAllStores } from '../../lib/storeReset'
-import { useMealsStore } from '../../stores/mealsStore'
+import { useMealsStore, QUEUE_KEY } from '../../stores/mealsStore'
 import { useDailySummaryStore } from '../../stores/dailySummaryStore'
 import { usePlansStore } from '../../stores/plansStore'
 import { useProfileStore } from '../../stores/profileStore'
+import { useHealthConnectStore } from '../../stores/healthConnectStore'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // resetAllStores transitively imports every data store (unlike each store's own
 // unit test, which imports only itself), so every native module those stores
@@ -34,13 +36,18 @@ jest.mock('expo-constants', () => ({ default: { expoConfig: { extra: { eas: { pr
 jest.mock('../../lib/api/agent', () => ({ sendAgentMessage: jest.fn() }))
 
 describe('resetAllStores', () => {
-  it('clears every data store back to its empty initial state (no cross-user leak)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('clears every data store back to its empty initial state (no cross-user leak)', async () => {
     useMealsStore.setState({ meals: [{ id: 'm1' } as never], pendingCount: 3 })
     useDailySummaryStore.setState({ summary: { id: 's1' } as never, recent: [{ id: 's1' } as never], loaded: true })
     usePlansStore.setState({ mealPlan: { id: 'p1' } as never })
     useProfileStore.setState({ profile: { id: 'u1' } as never, goals: { id: 'g1' } as never })
+    useHealthConnectStore.setState({ todayHeartRate: 72 })
 
-    resetAllStores()
+    await resetAllStores()
 
     expect(useMealsStore.getState().meals).toEqual([])
     expect(useMealsStore.getState().pendingCount).toBe(0)
@@ -50,5 +57,16 @@ describe('resetAllStores', () => {
     expect(usePlansStore.getState().mealPlan).toBeNull()
     expect(useProfileStore.getState().profile).toBeNull()
     expect(useProfileStore.getState().goals).toBeNull()
+    expect(useHealthConnectStore.getState().todayHeartRate).toBeNull()
+  })
+
+  it('purges the persisted offline meal queue so a second user on a shared device never inherits it', async () => {
+    await resetAllStores()
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(QUEUE_KEY)
+  })
+
+  it('never throws even when the queue removeItem rejects (best-effort purge)', async () => {
+    ;(AsyncStorage.removeItem as jest.Mock).mockRejectedValueOnce(new Error('storage exploded'))
+    await expect(resetAllStores()).resolves.toBeUndefined()
   })
 })

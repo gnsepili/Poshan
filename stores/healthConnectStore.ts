@@ -15,7 +15,9 @@ import {
   sessionsToActivityRows,
   sumStepsRecords,
   sumActiveCaloriesRecords,
+  averageHeartRate,
   HcExerciseSession,
+  HcHeartRateRecord,
 } from '../lib/utils/healthConnect'
 
 type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert']
@@ -33,6 +35,7 @@ interface HealthConnectState {
   permissionGranted: boolean
   todaySteps: number
   todayActiveCalories: number
+  todayHeartRate: number | null
   syncing: boolean
   error: string | null
   lastSyncedAt: string | null
@@ -53,6 +56,7 @@ export const useHealthConnectStore = create<HealthConnectState>()(
     permissionGranted: false,
     todaySteps: 0,
     todayActiveCalories: 0,
+    todayHeartRate: null,
     syncing: false,
     error: null,
     lastSyncedAt: null,
@@ -86,14 +90,16 @@ export const useHealthConnectStore = create<HealthConnectState>()(
       set((s) => { s.syncing = true; s.error = null })
       try {
         const range = todayRange()
-        const [stepsRes, calRes, sessionRes] = await Promise.all([
+        const [stepsRes, calRes, sessionRes, hrRes] = await Promise.all([
           readRecords('Steps', { timeRangeFilter: range }),
           readRecords('ActiveCaloriesBurned', { timeRangeFilter: range }),
           readRecords('ExerciseSession', { timeRangeFilter: range }),
+          readRecords('HeartRate', { timeRangeFilter: range }),
         ])
         const steps = sumStepsRecords((stepsRes.records ?? []) as { count: number }[])
         const activeCalories = sumActiveCaloriesRecords((calRes.records ?? []) as { energy: { inKilocalories: number } }[])
         const rows = sessionsToActivityRows(userId, (sessionRes.records ?? []) as HcExerciseSession[])
+        const heartRate = averageHeartRate((hrRes.records ?? []) as HcHeartRateRecord[])
 
         let error: string | null = null
         if (rows.length > 0) {
@@ -108,6 +114,7 @@ export const useHealthConnectStore = create<HealthConnectState>()(
           s.syncing = false
           s.todaySteps = steps
           s.todayActiveCalories = activeCalories
+          s.todayHeartRate = heartRate
           s.lastSyncedAt = new Date().toISOString()
           s.error = error
         })

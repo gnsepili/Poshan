@@ -11,7 +11,7 @@ import { QueuedMeal, enqueueMeal, removeMeal, updateMeal } from '../lib/utils/me
 
 type MealInsert = Database['public']['Tables']['meals']['Insert']
 
-const QUEUE_KEY = 'poshan.mealQueue.v1'
+export const QUEUE_KEY = 'poshan.mealQueue.v1'
 
 async function readQueue(): Promise<QueuedMeal[]> {
   const raw = await AsyncStorage.getItem(QUEUE_KEY)
@@ -139,51 +139,61 @@ export const useMealsStore = create<MealsState>()(
       set((s) => {
         s.flushing = true
       })
-      let q = await readQueue()
-      for (const item of q) {
-        try {
-          // Reuse an already-uploaded remote URL if a prior flush got this far before dying
-          // (see the persist-before-insert write below) — never re-upload in that case.
-          let photo_url = item.photo_url
-          if (!photo_url && item.photo_local_uri) {
-            const uploaded = await uploadQueuedPhoto(item)
-            if (!uploaded) {
-              // Photo upload failed: keep the meal queued rather than inserting it with a
-              // broken/missing photo. Stop here so ordering + no-loss is preserved.
-              break
+      // Everything below — including the initial read — runs inside try/finally so a
+      // rejecting AsyncStorage call (or any other unexpected throw) can never leave
+      // `flushing` stuck at true (that would permanently disable offline sync until
+      // the app restarts).
+      let q: QueuedMeal[] = []
+      try {
+        q = await readQueue()
+        for (const item of q) {
+          try {
+            // Reuse an already-uploaded remote URL if a prior flush got this far before dying
+            // (see the persist-before-insert write below) — never re-upload in that case.
+            let photo_url = item.photo_url
+            if (!photo_url && item.photo_local_uri) {
+              const uploaded = await uploadQueuedPhoto(item)
+              if (!uploaded) {
+                // Photo upload failed: keep the meal queued rather than inserting it with a
+                // broken/missing photo. Stop here so ordering + no-loss is preserved.
+                break
+              }
+              photo_url = uploaded
+              // Persist the uploaded URL (and drop the now-redundant local URI) BEFORE the
+              // insert: if the process dies between here and the insert's removeMeal below,
+              // the next flush sees photo_url already set and skips the upload entirely.
+              q = updateMeal(q, item.id, { photo_url, photo_local_uri: undefined })
+              await writeQueue(q)
             }
-            photo_url = uploaded
-            // Persist the uploaded URL (and drop the now-redundant local URI) BEFORE the
-            // insert: if the process dies between here and the insert's removeMeal below,
-            // the next flush sees photo_url already set and skips the upload entirely.
-            q = updateMeal(q, item.id, { photo_url, photo_local_uri: undefined })
+            const { error } = await supabase.from('meals').insert({
+              id: item.id,
+              user_id: item.user_id,
+              meal_type: item.meal_type,
+              description: item.description,
+              total_calories: item.total_calories,
+              protein_g: item.protein_g,
+              carbs_g: item.carbs_g,
+              fat_g: item.fat_g,
+              fiber_g: item.fiber_g,
+              photo_url: photo_url ?? null,
+              logged_at: item.queued_at,
+            } as unknown as MealInsert)
+            // Duplicate PK => this meal was already inserted by an earlier flaky flush: done, not an error.
+            if (error && !isDuplicateKey(error.message)) break // real failure: keep this + the rest, preserve order
+            q = removeMeal(q, item.id)
             await writeQueue(q)
+          } catch (_networkErr) {
+            break // dropped mid-flush: keep remaining for next time (no data loss)
           }
-          const { error } = await supabase.from('meals').insert({
-            id: item.id,
-            user_id: item.user_id,
-            meal_type: item.meal_type,
-            description: item.description,
-            total_calories: item.total_calories,
-            protein_g: item.protein_g,
-            carbs_g: item.carbs_g,
-            fat_g: item.fat_g,
-            fiber_g: item.fiber_g,
-            photo_url: photo_url ?? null,
-            logged_at: item.queued_at,
-          } as unknown as MealInsert)
-          // Duplicate PK => this meal was already inserted by an earlier flaky flush: done, not an error.
-          if (error && !isDuplicateKey(error.message)) break // real failure: keep this + the rest, preserve order
-          q = removeMeal(q, item.id)
-          await writeQueue(q)
-        } catch (_networkErr) {
-          break // dropped mid-flush: keep remaining for next time (no data loss)
         }
+      } finally {
+        // ALWAYS runs — even if readQueue() itself rejected — so `flushing` can never get
+        // stuck at true (which would silently disable offline sync until app restart).
+        set((s) => {
+          s.flushing = false
+          s.pendingCount = q.length
+        })
       }
-      set((s) => {
-        s.flushing = false
-        s.pendingCount = q.length
-      })
     },
   }))
 )

@@ -2,6 +2,8 @@
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { useProfileStore } from '../../stores/profileStore'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { QUEUE_KEY } from '../../stores/mealsStore'
 
 jest.mock('../../lib/supabase', () => ({
   supabase: {
@@ -96,6 +98,12 @@ describe('authStore', () => {
 
     expect(useProfileStore.getState().profile).toBeNull()
     expect(useProfileStore.getState().goals).toBeNull()
+  })
+
+  it('purges the offline meal queue on sign out (shared-device: user B must not inherit user A\'s queue)', async () => {
+    ;(supabase.auth.signOut as jest.Mock).mockResolvedValue({ error: null })
+    await useAuthStore.getState().signOut()
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(QUEUE_KEY)
   })
 
   it('sets error when session restore fails on initialize', async () => {

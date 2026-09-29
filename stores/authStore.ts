@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
       // second user on the same device never sees the previous user's cached
       // data (Review Focus #5).
       const { resetAllStores } = await import('../lib/storeReset')
-      resetAllStores()
+      await resetAllStores()
       set((s) => {
         s.loading = false
         s.session = null

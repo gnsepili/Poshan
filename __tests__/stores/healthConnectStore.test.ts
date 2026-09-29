@@ -15,7 +15,7 @@ jest.mock('react-native-health-connect', () => ({
 describe('healthConnectStore', () => {
   beforeEach(() => {
     useHealthConnectStore.setState({
-      available: null, permissionGranted: false, todaySteps: 0, todayActiveCalories: 0,
+      available: null, permissionGranted: false, todaySteps: 0, todayActiveCalories: 0, todayHeartRate: null,
       syncing: false, error: null, lastSyncedAt: null,
     })
     jest.clearAllMocks()
@@ -31,6 +31,7 @@ describe('healthConnectStore', () => {
     ;(HC.readRecords as jest.Mock).mockImplementation((type: string) => {
       if (type === 'Steps') return Promise.resolve({ records: [{ count: 1200 }, { count: 800 }] })
       if (type === 'ActiveCaloriesBurned') return Promise.resolve({ records: [{ energy: { inKilocalories: 150 } }] })
+      if (type === 'HeartRate') return Promise.resolve({ records: [{ samples: [{ beatsPerMinute: 60 }, { beatsPerMinute: 80 }] }] })
       return Promise.resolve({
         records: [{ startTime: '2026-09-29T06:00:00.000Z', endTime: '2026-09-29T06:30:00.000Z', exerciseType: 56 }],
       })
@@ -47,7 +48,20 @@ describe('healthConnectStore', () => {
     )
     expect(useHealthConnectStore.getState().todaySteps).toBe(2000)
     expect(useHealthConnectStore.getState().todayActiveCalories).toBe(150)
+    expect(useHealthConnectStore.getState().todayHeartRate).toBe(70)
     expect(useHealthConnectStore.getState().error).toBeNull()
+  })
+
+  it('syncNow sets todayHeartRate to null when there are no heart rate samples', async () => {
+    ;(HC.readRecords as jest.Mock).mockImplementation((type: string) =>
+      type === 'ExerciseSession'
+        ? Promise.resolve({ records: [{ startTime: '2026-09-29T06:00:00.000Z', endTime: '2026-09-29T06:30:00.000Z', exerciseType: 56 }] })
+        : Promise.resolve({ records: [] })
+    )
+    ;(supabase.from as jest.Mock).mockReturnValue({ upsert: jest.fn().mockResolvedValue({ error: null }) })
+
+    await useHealthConnectStore.getState().syncNow('u1')
+    expect(useHealthConnectStore.getState().todayHeartRate).toBeNull()
   })
 
   it('syncNow surfaces an upsert error', async () => {

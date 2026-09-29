@@ -104,6 +104,19 @@ describe('mealsStore', () => {
     expect(useMealsStore.getState().pendingCount).toBe(0)
   })
 
+  it('resets flushing even when AsyncStorage.getItem (readQueue) throws', async () => {
+    ;(AsyncStorage.getItem as jest.Mock).mockRejectedValue(new Error('storage exploded'))
+    const insert = jest.fn()
+    ;(supabase.from as jest.Mock).mockReturnValue({ insert })
+
+    // The finally block always resets `flushing` regardless of whether the underlying
+    // storage error is rethrown to the caller.
+    await expect(useMealsStore.getState().flushQueue()).rejects.toThrow('storage exploded')
+
+    expect(useMealsStore.getState().flushing).toBe(false)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
   it('does not run a second concurrent flush', async () => {
     useMealsStore.setState({ flushing: true })
     const insert = jest.fn()

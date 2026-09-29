@@ -70,3 +70,24 @@ export function sumStepsRecords(records: { count: number }[]): number {
 export function sumActiveCaloriesRecords(records: { energy: { inKilocalories: number } }[]): number {
   return Math.round(records.reduce((a, r) => a + (r.energy?.inKilocalories ?? 0), 0))
 }
+
+export interface HcHeartRateSample {
+  beatsPerMinute: number
+}
+
+export interface HcHeartRateRecord {
+  samples: HcHeartRateSample[]
+}
+
+// Average BPM across every sample in every HeartRate record pulled for the day.
+// Returns null when there's nothing to average (no records/samples), and is
+// defensive against malformed samples so it can never surface NaN/Infinity.
+export function averageHeartRate(records: HcHeartRateRecord[]): number | null {
+  const values = records
+    .flatMap((r) => r.samples ?? [])
+    .map((s) => s?.beatsPerMinute)
+    .filter((bpm): bpm is number => typeof bpm === 'number' && Number.isFinite(bpm))
+  if (values.length === 0) return null
+  const avg = values.reduce((a, v) => a + v, 0) / values.length
+  return Math.round(avg)
+}

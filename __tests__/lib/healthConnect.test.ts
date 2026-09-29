@@ -4,7 +4,9 @@ import {
   sessionsToActivityRows,
   sumStepsRecords,
   sumActiveCaloriesRecords,
+  averageHeartRate,
   HcExerciseSession,
+  HcHeartRateRecord,
 } from '../../lib/utils/healthConnect'
 
 describe('hcExerciseToActivityType', () => {
@@ -60,5 +62,32 @@ describe('aggregation helpers', () => {
   })
   it('sums active kilocalories, rounded', () => {
     expect(sumActiveCaloriesRecords([{ energy: { inKilocalories: 120.4 } }, { energy: { inKilocalories: 79.9 } }])).toBe(200)
+  })
+})
+
+describe('averageHeartRate', () => {
+  it('returns null when there are no records', () => {
+    expect(averageHeartRate([])).toBeNull()
+  })
+  it('returns null when records have no samples', () => {
+    const records: HcHeartRateRecord[] = [{ samples: [] }, { samples: [] }]
+    expect(averageHeartRate(records)).toBeNull()
+  })
+  it('averages samples across multiple records, rounded', () => {
+    const records: HcHeartRateRecord[] = [
+      { samples: [{ beatsPerMinute: 60 }, { beatsPerMinute: 70 }] },
+      { samples: [{ beatsPerMinute: 81 }] },
+    ]
+    // (60 + 70 + 81) / 3 = 70.33... -> 70
+    expect(averageHeartRate(records)).toBe(70)
+  })
+  it('returns the value for a single sample', () => {
+    const records: HcHeartRateRecord[] = [{ samples: [{ beatsPerMinute: 65 }] }]
+    expect(averageHeartRate(records)).toBe(65)
+  })
+  it('never returns NaN/Infinity for malformed samples', () => {
+    const records = [{ samples: [{ beatsPerMinute: undefined as unknown as number }] }] as HcHeartRateRecord[]
+    const result = averageHeartRate(records)
+    expect(result === null || Number.isFinite(result)).toBe(true)
   })
 })

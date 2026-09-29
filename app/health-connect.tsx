@@ -7,7 +7,7 @@ import { useHealthConnectStore } from '../stores/healthConnectStore'
 export default function HealthConnectScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { available, permissionGranted, todaySteps, todayActiveCalories, syncing, error, lastSyncedAt, checkAvailability, requestPermissions, syncNow } =
+  const { available, permissionGranted, todaySteps, todayActiveCalories, todayHeartRate, syncing, error, lastSyncedAt, checkAvailability, requestPermissions, syncNow } =
     useHealthConnectStore()
 
   useEffect(() => { checkAvailability() }, [])
@@ -45,6 +45,7 @@ export default function HealthConnectScreen() {
                   <Text className="text-gray-800 font-semibold mb-2">Today (from Health Connect)</Text>
                   <Text className="text-sm text-gray-600">Steps: {todaySteps}</Text>
                   <Text className="text-sm text-gray-600">Active calories: {todayActiveCalories} kcal</Text>
+                  <Text className="text-sm text-gray-600">Heart rate: {todayHeartRate != null ? `${todayHeartRate} bpm` : '—'}</Text>
                   {lastSyncedAt ? <Text className="text-xs text-gray-400 mt-2">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</Text> : null}
                 </View>
                 <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-4" disabled={syncing} onPress={() => user && syncNow(user.id)}>
