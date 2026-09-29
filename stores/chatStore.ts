@@ -52,7 +52,7 @@ export const useChatStore = create<ChatState>()(
       } catch (e) {
         set((s) => {
           s.loading = false
-          s.error = (e as Error).message
+          s.error = e instanceof Error ? e.message : String(e)
         })
       }
     },
@@ -71,15 +71,14 @@ export const useChatStore = create<ChatState>()(
         s.loading = false
         s.error = error?.message ?? null
         if (!error && data) {
-          const history = data as unknown as (ChatHistoryMessage & { role: string })[]
-          s.messages = history.map((m) => ({
+          s.messages = data.map((m) => ({
             id: m.id,
             conversation_id: m.conversation_id,
             role: m.role as ChatRole,
             content: m.content,
             created_at: m.created_at,
           }))
-          const last = history[history.length - 1]
+          const last = data[data.length - 1]
           if (last) s.conversationId = last.conversation_id
         }
       })

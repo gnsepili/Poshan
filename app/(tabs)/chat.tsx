@@ -7,7 +7,7 @@ import { ChatInput } from '../../components/chat/ChatInput'
 
 export default function ChatScreen() {
   const { user } = useAuthStore()
-  const { messages, loading, sendMessage, loadHistory } = useChatStore()
+  const { messages, loading, error, sendMessage, loadHistory } = useChatStore()
   const [input, setInput] = useState('')
   const listRef = useRef<FlatList>(null)
 
@@ -20,6 +20,7 @@ export default function ChatScreen() {
     const text = input.trim()
     setInput('')
     await sendMessage(user.id, text)
+    if (useChatStore.getState().error) setInput(text)
     listRef.current?.scrollToEnd()
   }
 
@@ -45,6 +46,7 @@ export default function ChatScreen() {
         onContentSizeChange={() => listRef.current?.scrollToEnd()}
       />
       {loading && <ActivityIndicator className="py-2" color="#16a34a" />}
+      {error && <Text className="text-red-500 text-xs px-4 pb-1">{error}</Text>}
       <ChatInput value={input} onChangeText={setInput} onSend={handleSend} disabled={loading} />
     </KeyboardAvoidingView>
   )
