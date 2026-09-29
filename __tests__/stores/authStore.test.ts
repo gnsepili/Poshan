@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { useProfileStore } from '../../stores/profileStore'
 
 jest.mock('../../lib/supabase', () => ({
   supabase: {
@@ -11,8 +12,37 @@ jest.mock('../../lib/supabase', () => ({
       getSession: jest.fn(),
       onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
     },
+    from: jest.fn(),
+    storage: { from: jest.fn() },
   },
 }))
+// signOut dynamically imports lib/storeReset, which transitively imports every
+// data store; those stores' native module imports need the same mocks their own
+// unit tests use, or import-time execution throws (see e.g. mealsStore.test.ts).
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+}))
+jest.mock('expo-file-system/legacy', () => ({
+  readAsStringAsync: jest.fn(),
+  EncodingType: { Base64: 'base64' },
+}))
+jest.mock('react-native-health-connect', () => ({
+  initialize: jest.fn(),
+  getSdkStatus: jest.fn(),
+  SdkAvailabilityStatus: { SDK_AVAILABLE: 3, SDK_UNAVAILABLE: 1 },
+  requestPermission: jest.fn(),
+  readRecords: jest.fn(),
+}))
+jest.mock('expo-notifications', () => ({
+  getPermissionsAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn(),
+  getExpoPushTokenAsync: jest.fn(),
+  setNotificationHandler: jest.fn(),
+}))
+jest.mock('expo-constants', () => ({ default: { expoConfig: { extra: { eas: { projectId: 'proj-1' } } } } }))
+jest.mock('../../lib/api/agent', () => ({ sendAgentMessage: jest.fn() }))
 
 describe('authStore', () => {
   beforeEach(() => useAuthStore.setState({ session: null, user: null, loading: false, error: null }))
@@ -55,6 +85,17 @@ describe('authStore', () => {
     expect(useAuthStore.getState().error).toBeNull()
     expect(useAuthStore.getState().session).toBeNull()
     expect(useAuthStore.getState().user).toBeNull()
+  })
+
+  it('wipes other users data stores on sign out (Review Focus #5: no cross-user leak)', async () => {
+    // Populate a data store the way it would look mid-session for user A.
+    useProfileStore.setState({ profile: { id: 'user-a' } as never, goals: { id: 'goal-a' } as never })
+    ;(supabase.auth.signOut as jest.Mock).mockResolvedValue({ error: null })
+
+    await useAuthStore.getState().signOut()
+
+    expect(useProfileStore.getState().profile).toBeNull()
+    expect(useProfileStore.getState().goals).toBeNull()
   })
 
   it('sets error when session restore fails on initialize', async () => {

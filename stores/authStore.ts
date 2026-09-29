@@ -46,6 +46,12 @@ export const useAuthStore = create<AuthState>()(
     signOut: async () => {
       set((s) => { s.loading = true; s.error = null })
       const { error } = await supabase.auth.signOut()
+      // Dynamic import: authStore must never statically import the data stores
+      // (would create a module-init cycle). This wipes every per-user store so a
+      // second user on the same device never sees the previous user's cached
+      // data (Review Focus #5).
+      const { resetAllStores } = await import('../lib/storeReset')
+      resetAllStores()
       set((s) => {
         s.loading = false
         s.session = null
