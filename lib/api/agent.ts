@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { messageForStatus } from '../utils/rateLimit'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,8 +30,8 @@ export async function sendAgentMessage(
   const body: unknown = await response.json()
 
   if (!response.ok) {
-    const message2 = (body as { error?: string } | null)?.error ?? `Agent request failed with status ${response.status}`
-    throw new Error(message2)
+    const fallback = (body as { error?: string } | null)?.error ?? `Agent request failed with status ${response.status}`
+    throw new Error(messageForStatus(response.status, fallback))
   }
 
   return body as AgentResponse

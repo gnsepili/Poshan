@@ -74,6 +74,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
+    // Per-user daily cap to prevent runaway OpenAI spend (env-configurable, default 50).
+    const cap = Number(Deno.env.get('AI_DAILY_CALL_CAP') ?? '50')
+    const { data: allowed } = await supabase.rpc('check_and_increment_ai_usage', { p_user_id: userId, p_cap: cap })
+    if (allowed === false) {
+      return new Response(JSON.stringify({ error: "You've reached today's AI limit. It resets at midnight." }), { status: 429, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
     // Persist the user's message
     await supabase.from('chat_messages').insert({ user_id: userId, conversation_id: convId, role: 'user', content: message })
 

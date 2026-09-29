@@ -1,4 +1,5 @@
 import { supabase } from '../supabase'
+import { messageForStatus } from '../utils/rateLimit'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
@@ -30,8 +31,8 @@ export async function analyzeInBodyPhoto(photoPath: string): Promise<InBodyAnaly
   const body: unknown = await response.json()
 
   if (!response.ok) {
-    const message = (body as { error?: string } | null)?.error ?? `InBody analysis request failed with status ${response.status}`
-    throw new Error(message)
+    const fallback = (body as { error?: string } | null)?.error ?? `InBody analysis request failed with status ${response.status}`
+    throw new Error(messageForStatus(response.status, fallback))
   }
 
   return body as InBodyAnalysisResult
