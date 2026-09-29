@@ -22,3 +22,6 @@ expo-env.d.ts
 
 # Supabase CLI temp files
 supabase/.temp/
+
+# Play Store submission credentials (user-provided, never commit)
+play-service-account.json

@@ -67,7 +67,8 @@
       "router": {},
       "eas": {
         "projectId": "e0aed009-415a-478c-9917-3cb381442217"
-      }
+      },
+      "privacyPolicyUrl": "https://poshanai.app/privacy"
     },
     "owner": "gnsepili"
   }
