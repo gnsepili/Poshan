@@ -60,6 +60,55 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'log_activity',
+      description: 'Log a physical activity the user did (walk, run, gym, cycle, swim, yoga, other) with optional duration, steps, and calories burned.',
+      parameters: {
+        type: 'object',
+        properties: {
+          activity_type: { type: 'string', enum: ['walk', 'run', 'gym', 'cycle', 'swim', 'yoga', 'other'] },
+          duration_min: { type: 'number' },
+          steps: { type: 'number' },
+          calories_burned: { type: 'number' },
+          notes: { type: 'string' },
+        },
+        required: ['activity_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_inbody_history',
+      description: "Get the user's InBody body-composition scans over time (weight, body fat %, muscle mass, visceral fat, BMR), most recent first.",
+      parameters: {
+        type: 'object',
+        properties: { limit: { type: 'number', description: 'Max scans to return, default 10' } },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'adjust_diet_plan',
+      description: "Adjust the user's nutrition/step targets based on their progress and latest InBody results. Inserts a NEW goals row (goals are append-only; latest wins). Provide only the fields you want to change; unspecified fields carry over from the current goals. Always include a short rationale in notes.",
+      parameters: {
+        type: 'object',
+        properties: {
+          daily_calorie_target: { type: 'number' },
+          daily_protein_g: { type: 'number' },
+          daily_carbs_g: { type: 'number' },
+          daily_fat_g: { type: 'number' },
+          daily_steps_target: { type: 'number' },
+          target_weight_kg: { type: 'number' },
+          notes: { type: 'string', description: 'Short rationale for the adjustment' },
+        },
+        required: ['notes'],
+      },
+    },
+  },
 ]
 
 export async function executeTool(
@@ -135,6 +184,55 @@ export async function executeTool(
     })
     if (error) return `Error updating goals: ${error.message}`
     return 'Goals updated successfully.'
+  }
+
+  if (name === 'log_activity') {
+    const { error } = await supabase.from('activity_logs').insert({
+      user_id: userId,
+      activity_type: input.activity_type,
+      duration_min: input.duration_min ?? 0,
+      steps: input.steps ?? 0,
+      calories_burned: input.calories_burned ?? 0,
+      notes: input.notes ?? '',
+      logged_at: new Date().toISOString(),
+    })
+    if (error) return `Error logging activity: ${error.message}`
+    return `Activity logged: ${input.activity_type}${input.duration_min ? `, ${input.duration_min} min` : ''}${input.steps ? `, ${input.steps} steps` : ''}${input.calories_burned ? `, ${input.calories_burned} kcal` : ''}`
+  }
+
+  if (name === 'get_inbody_history') {
+    const limit = typeof input.limit === 'number' ? input.limit : 10
+    const { data, error } = await supabase
+      .from('inbody_reports')
+      .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, visceral_fat, bmr, ai_notes')
+      .eq('user_id', userId)
+      .order('scanned_at', { ascending: false })
+      .limit(limit)
+    if (error) return `Error reading InBody history: ${error.message}`
+    if (!data || data.length === 0) return 'No InBody scans on record yet.'
+    return JSON.stringify(data)
+  }
+
+  if (name === 'adjust_diet_plan') {
+    const { data: existing } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!existing) return 'No existing goals to adjust. The user should set goals in onboarding first.'
+    const { notes, ...changes } = input
+    // Goals are append-only / latest-wins: INSERT a new row, never mutate the old one.
+    const { id: _id, created_at: _createdAt, ...carryOver } = existing
+    const { error } = await supabase.from('goals').insert({
+      ...carryOver,
+      ...changes,
+      notes: typeof notes === 'string' ? notes : (carryOver.notes ?? ''),
+      user_id: userId,
+    })
+    if (error) return `Error adjusting diet plan: ${error.message}`
+    return `Diet plan adjusted; new targets saved as a new goals row. Rationale: ${notes ?? ''}`
   }
 
   return `Unknown tool: ${name}`

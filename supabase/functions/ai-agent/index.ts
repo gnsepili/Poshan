@@ -13,6 +13,19 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
 const MODEL = 'gpt-4o'
 
+// Coaching principles adapted (content only, not its file-storage mechanics) from the
+// MIT-licensed NataMoroz/nutrition-coach skill: https://github.com/NataMoroz/nutrition-coach
+const COACHING_PRINCIPLES = `
+Coaching principles (apply when advising or adjusting the plan):
+- Protein first: prioritise hitting the daily protein target — it preserves lean mass in a deficit and drives recovery. Never cut protein to make calories fit.
+- Moderate deficit over aggressive: prefer a sustainable ~10-20% calorie deficit for fat loss; aggressive deficits cost muscle and adherence.
+- Carbs are training fuel: keep carbohydrates around training days; do not fear them when the user is active.
+- Peri-workout fueling: suggest carbs + protein before and after workouts for performance and recovery.
+- Scale-weight is noisy: daily weight swings are water, glycogen, and gut content. Judge trends over 1-2 weeks and cross-check against InBody body-fat and muscle-mass trends, not single readings.
+- Sex-based and female-physiology nuance: for women, expect cycle-phase water shifts; do NOT push an aggressive deficit while breastfeeding (protect milk supply — keep adequate calories and fluids); prioritise postpartum recovery over fat loss; keep iron/ferritin and bone-density (calcium, vitamin D) awareness.
+- Safety floors: never recommend calories below a safe floor (~1200 kcal/day for women, ~1500 kcal/day for men) and never below the user's protein target. If the math would breach a floor, extend the timeline instead.
+`.trim()
+
 interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string | null
@@ -77,7 +90,7 @@ Deno.serve(async (req) => {
     const messages: OpenAiMessage[] = [
       {
         role: 'system',
-        content: `You are Poshan AI, a warm, encouraging personal health coach. You have full access to the user's health data below. Be concise, practical, and specific. When the user tells you what they ate, estimate macros and log the meal with the log_meal tool. Use tools to read goals and daily summaries when relevant.\n\n${systemContext}`,
+        content: `You are Poshan AI, a warm, encouraging personal health coach. You have full access to the user's health data below. Be concise, practical, and specific. When the user tells you what they ate, estimate macros and log the meal with the log_meal tool. When they describe a workout, log it with log_activity. Use get_inbody_history and daily summaries to judge progress, and use adjust_diet_plan (which appends a new goals row) when results warrant a change.\n\n${COACHING_PRINCIPLES}\n\n${systemContext}`,
       },
       ...(history ?? []).map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ]
