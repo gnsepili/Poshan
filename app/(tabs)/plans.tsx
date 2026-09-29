@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { usePlansStore } from '../../stores/plansStore'
-import { planDays } from '../../lib/utils/plan'
+import { planDays, dayMeals, dayExercises } from '../../lib/utils/plan'
 import { MealPlanDay, WorkoutPlanDay } from '../../types'
 
 export default function PlansScreen() {
@@ -37,7 +37,7 @@ export default function PlansScreen() {
           mealDays.map((d, i) => (
             <View key={`${d.day}-${i}`} className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
               <Text className="font-semibold text-gray-900 mb-2">{d.day}</Text>
-              {d.meals.map((m, j) => (
+              {dayMeals(d).map((m, j) => (
                 <View key={j} className="mb-2">
                   <Text className="text-sm text-gray-800 capitalize">{m.meal_type}: {m.description}</Text>
                   <Text className="text-xs text-gray-500">{m.calories} kcal · {m.protein_g}p / {m.carbs_g}c / {m.fat_g}f</Text>
@@ -63,7 +63,7 @@ export default function PlansScreen() {
             <View key={`${d.day}-${i}`} className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
               <Text className="font-semibold text-gray-900">{d.day}</Text>
               <Text className="text-xs text-gray-500 mb-2">{d.focus}</Text>
-              {d.exercises.map((ex, j) => (
+              {dayExercises(d).map((ex, j) => (
                 <View key={j} className="mb-1">
                   <Text className="text-sm text-gray-800">{ex.name} — {ex.sets} × {ex.reps}</Text>
                   {ex.notes ? <Text className="text-xs text-gray-400">{ex.notes}</Text> : null}
