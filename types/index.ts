@@ -82,3 +82,32 @@ export interface DailySummary {
   ai_coach_note: string | null
   created_at: string
 }
+
+export type ActivityType = 'walk' | 'run' | 'gym' | 'cycle' | 'swim' | 'yoga' | 'other'
+
+export interface InBodyReport {
+  id: string
+  user_id: string
+  scanned_at: string
+  photo_url: string | null
+  weight_kg: number | null
+  body_fat_pct: number | null
+  muscle_mass_kg: number | null
+  visceral_fat: number | null
+  bmr: number | null
+  raw_extracted_json: unknown | null
+  ai_notes: string | null
+  created_at: string
+}
+
+export interface ActivityLog {
+  id: string
+  user_id: string
+  logged_at: string
+  activity_type: ActivityType
+  duration_min: number
+  steps: number
+  calories_burned: number
+  notes: string
+  created_at: string
+}
