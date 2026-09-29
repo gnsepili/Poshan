@@ -85,6 +85,7 @@ export interface DailySummary {
 
 export type ActivityType = 'walk' | 'run' | 'gym' | 'cycle' | 'swim' | 'yoga' | 'other'
 export type ActivitySource = 'manual' | 'health_connect'
+export type PushPlatform = 'android' | 'ios'
 
 export interface InBodyReport {
   id: string

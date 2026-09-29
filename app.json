@@ -36,7 +36,8 @@
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.READ_HEART_RATE",
-        "android.permission.health.READ_EXERCISE"
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -56,7 +57,11 @@
           "photosPermission": "Poshan AI accesses your photos to log meal images."
         }
       ],
-      "react-native-health-connect"
+      "react-native-health-connect",
+      [
+        "expo-notifications",
+        { "icon": "./assets/icon.png", "color": "#16a34a" }
+      ]
     ],
     "extra": {
       "router": {},

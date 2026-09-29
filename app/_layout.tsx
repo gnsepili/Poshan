@@ -6,10 +6,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { useAuthStore } from '../stores/authStore'
 import { useProfileStore } from '../stores/profileStore'
+import { usePushStore } from '../stores/pushStore'
 
 export default function RootLayout() {
   const { session, user, initialize } = useAuthStore()
   const { profile, fetchProfile } = useProfileStore()
+  const { registerForPush } = usePushStore()
   const [authReady, setAuthReady] = useState(false)
   const [profileChecked, setProfileChecked] = useState(false)
   const router = useRouter()
@@ -27,6 +29,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (session && user) {
       fetchProfile(user.id).finally(() => setProfileChecked(true))
+      registerForPush(user.id)
     } else {
       setProfileChecked(false)
     }

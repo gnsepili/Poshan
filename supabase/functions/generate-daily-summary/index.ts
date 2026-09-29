@@ -11,6 +11,7 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
+const SEND_PUSH_URL = `${SUPABASE_URL}/functions/v1/send-push`
 
 // Same coaching principles the ai-agent applies. Duplicated here because each
 // edge function is an isolated Deno deployment (no shared import across functions).
@@ -122,8 +123,28 @@ Deno.serve(async (req) => {
       const { data: profiles, error } = await supabase.from('profiles').select('id')
       if (error) throw new Error(error.message)
       let generated = 0
+      const notifications: { user_id: string; title: string; body: string }[] = []
       for (const p of (profiles ?? []) as { id: string }[]) {
-        try { await generateForUser(p.id, supabase); generated += 1 } catch (_e) { /* skip one bad user, keep the batch going */ }
+        try {
+          const row = await generateForUser(p.id, supabase)
+          generated += 1
+          const note = (row?.ai_coach_note as string | undefined) ?? ''
+          if (note) notifications.push({ user_id: p.id, title: 'Your morning coach note', body: note })
+        } catch (_e) { /* skip one bad user, keep the batch going */ }
+      }
+      // Best-effort: one send-push call for the whole batch (the single send path).
+      if (notifications.length > 0) {
+        try {
+          await fetch(SEND_PUSH_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-cron-secret': CRON_SECRET,
+              Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({ notifications }),
+          })
+        } catch (_e) { /* push is best-effort; never fail the cron over it */ }
       }
       return new Response(JSON.stringify({ ok: true, generated }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
