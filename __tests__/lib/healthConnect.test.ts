@@ -13,6 +13,7 @@ describe('hcExerciseToActivityType', () => {
     expect(hcExerciseToActivityType(56)).toBe('run')
     expect(hcExerciseToActivityType(8)).toBe('cycle')
     expect(hcExerciseToActivityType(73)).toBe('swim')
+    expect(hcExerciseToActivityType(74)).toBe('swim')
     expect(hcExerciseToActivityType(70)).toBe('gym')
     expect(hcExerciseToActivityType(83)).toBe('yoga')
   })

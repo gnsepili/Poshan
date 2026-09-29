@@ -6,8 +6,10 @@ import {
   SdkAvailabilityStatus,
   requestPermission,
   readRecords,
+  Permission,
 } from 'react-native-health-connect'
 import { supabase } from '../lib/supabase'
+import { Database } from '../lib/database.types'
 import {
   sessionsToActivityRows,
   sumStepsRecords,
@@ -15,8 +17,10 @@ import {
   HcExerciseSession,
 } from '../lib/utils/healthConnect'
 
+type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert']
+
 // Read-only Health Connect permissions the spec requires.
-const HC_PERMISSIONS = [
+const HC_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'HeartRate' },
@@ -70,7 +74,7 @@ export const useHealthConnectStore = create<HealthConnectState>()(
           set((s) => { s.available = false; s.error = 'Health Connect is not available on this device.' })
           return
         }
-        const granted = await requestPermission(HC_PERMISSIONS as unknown as Parameters<typeof requestPermission>[0])
+        const granted = await requestPermission(HC_PERMISSIONS)
         set((s) => { s.permissionGranted = Array.isArray(granted) && granted.length > 0 })
       } catch (e) {
         set((s) => { s.error = e instanceof Error ? e.message : String(e) })
@@ -88,14 +92,14 @@ export const useHealthConnectStore = create<HealthConnectState>()(
         ])
         const steps = sumStepsRecords((stepsRes.records ?? []) as { count: number }[])
         const activeCalories = sumActiveCaloriesRecords((calRes.records ?? []) as { energy: { inKilocalories: number } }[])
-        const rows = sessionsToActivityRows(userId, (sessionRes.records ?? []) as unknown as HcExerciseSession[])
+        const rows = sessionsToActivityRows(userId, (sessionRes.records ?? []) as HcExerciseSession[])
 
         let error: string | null = null
         if (rows.length > 0) {
           // Idempotent: the dedup unique index collapses a re-synced session (Review Focus #1).
           const { error: upsertError } = await supabase
             .from('activity_logs')
-            .upsert(rows as unknown as never, { onConflict: 'user_id,source,logged_at,activity_type', ignoreDuplicates: true })
+            .upsert(rows as unknown as ActivityLogInsert[], { onConflict: 'user_id,source,logged_at,activity_type', ignoreDuplicates: true })
           error = upsertError?.message ?? null
         }
 
