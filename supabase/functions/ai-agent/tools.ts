@@ -109,6 +109,119 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_meal_plan',
+      description: "Generate a full 7-day meal plan aligned to the user's calorie and macro goals and save it. YOU must supply the complete plan_json — do not ask another system to produce it. Each day has breakfast/lunch/dinner/snack meals with per-meal macros.",
+      parameters: {
+        type: 'object',
+        properties: {
+          week_start_date: { type: 'string', description: 'ISO date YYYY-MM-DD for the Monday of the plan week; defaults to today' },
+          plan: {
+            type: 'object',
+            description: 'The full plan: { days: [ { day, meals: [ { meal_type, description, calories, protein_g, carbs_g, fat_g } ] } ] }',
+            properties: {
+              days: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    day: { type: 'string' },
+                    meals: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+                          description: { type: 'string' },
+                          calories: { type: 'number' },
+                          protein_g: { type: 'number' },
+                          carbs_g: { type: 'number' },
+                          fat_g: { type: 'number' },
+                        },
+                        required: ['meal_type', 'description', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+                      },
+                    },
+                  },
+                  required: ['day', 'meals'],
+                },
+              },
+            },
+            required: ['days'],
+          },
+        },
+        required: ['plan'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_workout_plan',
+      description: "Generate a full weekly workout plan based on the user's goals, activity level, and InBody data, and save it. YOU must supply the complete plan_json. Each day has a focus and a list of exercises.",
+      parameters: {
+        type: 'object',
+        properties: {
+          week_start_date: { type: 'string', description: 'ISO date YYYY-MM-DD for the Monday of the plan week; defaults to today' },
+          plan: {
+            type: 'object',
+            description: 'The full plan: { days: [ { day, focus, exercises: [ { name, sets, reps, notes } ] } ] }',
+            properties: {
+              days: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    day: { type: 'string' },
+                    focus: { type: 'string' },
+                    exercises: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          name: { type: 'string' },
+                          sets: { type: 'number' },
+                          reps: { type: 'string' },
+                          notes: { type: 'string' },
+                        },
+                        required: ['name', 'sets', 'reps'],
+                      },
+                    },
+                  },
+                  required: ['day', 'focus', 'exercises'],
+                },
+              },
+            },
+            required: ['days'],
+          },
+        },
+        required: ['plan'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_progress_report',
+      description: "Get the user's trend data (weight/body-fat/muscle from InBody, calorie adherence from daily summaries) over a date range, to narrate how they are doing.",
+      parameters: {
+        type: 'object',
+        properties: {
+          start_date: { type: 'string', description: 'ISO date YYYY-MM-DD; defaults to 30 days before end_date' },
+          end_date: { type: 'string', description: 'ISO date YYYY-MM-DD; defaults to today' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_meal_suggestion',
+      description: "Compute the macros the user has left for today (target minus consumed) so you can suggest a concrete meal that fits.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ]
 
 export async function executeTool(
@@ -233,6 +346,68 @@ export async function executeTool(
     })
     if (error) return `Error adjusting diet plan: ${error.message}`
     return `Diet plan adjusted; new targets saved as a new goals row. Rationale: ${notes ?? ''}`
+  }
+
+  if (name === 'generate_meal_plan' || name === 'generate_workout_plan') {
+    const plan = input.plan
+    // Malformed plan_json from the model must NOT be persisted (Review Focus #4).
+    if (!plan || typeof plan !== 'object' || !Array.isArray((plan as { days?: unknown }).days) || (plan as { days: unknown[] }).days.length === 0) {
+      return 'Error: plan must be an object with a non-empty "days" array. Re-call the tool with the full plan_json.'
+    }
+    const table = name === 'generate_meal_plan' ? 'meal_plans' : 'workout_plans'
+    const weekStart = typeof input.week_start_date === 'string' ? input.week_start_date : new Date().toISOString().split('T')[0]
+    // Plans are append-only / latest-wins: INSERT a new row every time.
+    const { error } = await supabase.from(table).insert({
+      user_id: userId,
+      week_start_date: weekStart,
+      plan_json: plan,
+    })
+    if (error) return `Error saving plan: ${error.message}`
+    const dayCount = (plan as { days: unknown[] }).days.length
+    return `${name === 'generate_meal_plan' ? 'Meal' : 'Workout'} plan saved for the week of ${weekStart} (${dayCount} days). Tell the user to open the Plans tab.`
+  }
+
+  if (name === 'get_progress_report') {
+    const end = typeof input.end_date === 'string' ? input.end_date : new Date().toISOString().split('T')[0]
+    const start = typeof input.start_date === 'string'
+      ? input.start_date
+      : new Date(new Date(`${end}T00:00:00Z`).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const [inbodyRes, dailyRes] = await Promise.all([
+      supabase.from('inbody_reports')
+        .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg')
+        .eq('user_id', userId)
+        .gte('scanned_at', `${start}T00:00:00`).lte('scanned_at', `${end}T23:59:59`)
+        .order('scanned_at', { ascending: true }),
+      supabase.from('daily_summaries')
+        .select('date, total_calories_consumed, ai_daily_goals')
+        .eq('user_id', userId)
+        .gte('date', start).lte('date', end)
+        .order('date', { ascending: true }),
+    ])
+    return JSON.stringify({ start, end, inbody: inbodyRes.data ?? [], daily: dailyRes.data ?? [] })
+  }
+
+  if (name === 'get_meal_suggestion') {
+    const today = new Date().toISOString().split('T')[0]
+    const [mealsRes, goalsRes] = await Promise.all([
+      supabase.from('meals').select('total_calories, protein_g, carbs_g, fat_g')
+        .eq('user_id', userId).gte('logged_at', `${today}T00:00:00`).lte('logged_at', `${today}T23:59:59`),
+      supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    const meals = (mealsRes.data ?? []) as { total_calories: number; protein_g: number; carbs_g: number; fat_g: number }[]
+    const consumed = meals.reduce(
+      (a, m) => ({ cal: a.cal + m.total_calories, p: a.p + m.protein_g, c: a.c + m.carbs_g, f: a.f + m.fat_g }),
+      { cal: 0, p: 0, c: 0, f: 0 }
+    )
+    const g = goalsRes.data as { daily_calorie_target: number; daily_protein_g: number; daily_carbs_g: number; daily_fat_g: number } | null
+    if (!g) return 'No goals set yet — ask the user to set goals in onboarding before suggesting meals.'
+    return JSON.stringify({
+      remaining_calories: g.daily_calorie_target - consumed.cal,
+      remaining_protein_g: g.daily_protein_g - consumed.p,
+      remaining_carbs_g: g.daily_carbs_g - consumed.c,
+      remaining_fat_g: g.daily_fat_g - consumed.f,
+      note: 'Suggest ONE concrete meal that roughly fits these remaining macros.',
+    })
   }
 
   return `Unknown tool: ${name}`
