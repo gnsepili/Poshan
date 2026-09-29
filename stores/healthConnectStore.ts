@@ -9,6 +9,7 @@ import {
   Permission,
 } from 'react-native-health-connect'
 import { supabase } from '../lib/supabase'
+import { logEvent } from '../lib/telemetry'
 import { Database } from '../lib/database.types'
 import {
   sessionsToActivityRows,
@@ -110,6 +111,7 @@ export const useHealthConnectStore = create<HealthConnectState>()(
           s.lastSyncedAt = new Date().toISOString()
           s.error = error
         })
+        logEvent('hc_synced', { steps, sessions: rows.length }, userId)
       } catch (e) {
         set((s) => { s.syncing = false; s.error = e instanceof Error ? e.message : String(e) })
       }

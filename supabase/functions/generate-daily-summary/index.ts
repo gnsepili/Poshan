@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logEdgeError } from '../_shared/logError.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -160,6 +161,12 @@ Deno.serve(async (req) => {
     const todayRow = await generateForUser(userData.user.id, supabase)
     return new Response(JSON.stringify(todayRow), { headers: { ...CORS, 'Content-Type': 'application/json' } })
   } catch (e) {
+    try {
+      const svc = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      await logEdgeError(svc, 'generate-daily-summary', e)
+    } catch (_ignore) {
+      /* logging is best-effort */
+    }
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
   }
 })

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logEdgeError } from '../_shared/logError.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -96,6 +97,12 @@ Be realistic but slightly conservative with estimates.`
 
     return new Response(JSON.stringify(parsed), { headers: { ...CORS, 'Content-Type': 'application/json' } })
   } catch (e) {
+    try {
+      const svc = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      await logEdgeError(svc, 'ai-meal-analysis', e)
+    } catch (_ignore) {
+      /* logging is best-effort */
+    }
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
   }
 })

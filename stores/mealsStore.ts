@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from '../lib/supabase'
+import { logEvent } from '../lib/telemetry'
 import { Database } from '../lib/database.types'
 import { Meal } from '../types'
 import { QueuedMeal, enqueueMeal, removeMeal, updateMeal } from '../lib/utils/mealQueue'
@@ -105,6 +106,7 @@ export const useMealsStore = create<MealsState>()(
           if (!error && data) s.meals.unshift(data as Meal)
           s.error = error?.message ?? null
         })
+        if (!error && data) logEvent('meal_logged', { meal_type: meal.meal_type }, meal.user_id)
         return error ? null : (data as Meal)
       } catch (_networkErr) {
         // No connectivity: queue for flush on reconnect (photos keep their local URI).

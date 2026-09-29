@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { logEdgeError } from '../_shared/logError.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -117,6 +118,12 @@ Rules: Use kilograms for weight and muscle mass, a percentage for body fat, kcal
 
     return new Response(JSON.stringify(result), { headers: { ...CORS, 'Content-Type': 'application/json' } })
   } catch (e) {
+    try {
+      const svc = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      await logEdgeError(svc, 'ai-inbody-analysis', e)
+    } catch (_ignore) {
+      /* logging is best-effort */
+    }
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
   }
 })

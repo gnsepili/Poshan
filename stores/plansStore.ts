@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { supabase } from '../lib/supabase'
+import { logEvent } from '../lib/telemetry'
 import { sendAgentMessage } from '../lib/api/agent'
 import { MealPlan, MealPlanJson, WorkoutPlan, WorkoutPlanJson } from '../types'
 
@@ -54,6 +55,7 @@ export const usePlansStore = create<PlansState>()(
       }
       set((s) => { s.generating = false })
       await get().fetchPlans(userId)
+      logEvent('plan_generated', { kind: 'meal' }, userId)
       // If the agent succeeded but no row was persisted, surface a sensible message.
       if (!get().mealPlan) {
         set((s) => { s.error = s.error ?? 'The coach could not generate a meal plan right now. Please try again.' })
@@ -70,6 +72,7 @@ export const usePlansStore = create<PlansState>()(
       }
       set((s) => { s.generating = false })
       await get().fetchPlans(userId)
+      logEvent('plan_generated', { kind: 'workout' }, userId)
       if (!get().workoutPlan) {
         set((s) => { s.error = s.error ?? 'The coach could not generate a workout plan right now. Please try again.' })
       }

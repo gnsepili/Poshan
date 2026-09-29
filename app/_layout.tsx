@@ -10,6 +10,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useProfileStore } from '../stores/profileStore'
 import { usePushStore } from '../stores/pushStore'
 import { useMealsStore } from '../stores/mealsStore'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 
 export default function RootLayout() {
   const { session, user, initialize } = useAuthStore()
@@ -74,19 +75,21 @@ export default function RootLayout() {
   }, [session, profile, profileChecked, authReady, segments])
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(onboarding)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="inbody" />
-          <Stack.Screen name="activity" />
-          <Stack.Screen name="progress" />
-          <Stack.Screen name="health-connect" />
-        </Stack>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(onboarding)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="inbody" />
+            <Stack.Screen name="activity" />
+            <Stack.Screen name="progress" />
+            <Stack.Screen name="health-connect" />
+          </Stack>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   )
 }
