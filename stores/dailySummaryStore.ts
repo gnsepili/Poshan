@@ -115,15 +115,18 @@ export const useDailySummaryStore = create<DailySummaryState>()(
 
     fetchRecent: async (userId) => {
       set((s) => { s.loading = true; s.error = null })
+      // Fetch the most-recent 30 rows (descending), then reverse to ascending so
+      // the bar chart still renders oldest -> newest, left to right.
       const { data, error } = await supabase
         .from('daily_summaries')
         .select('*')
         .eq('user_id', userId)
-        .order('date', { ascending: true })
+        .order('date', { ascending: false })
         .limit(30)
+      const rows = ((data ?? []) as DailySummary[]).slice().reverse()
       set((s) => {
         s.loading = false
-        s.recent = error ? [] : (data as DailySummary[])
+        s.recent = error ? [] : rows
         s.error = error?.message ?? null
       })
     },

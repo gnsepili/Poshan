@@ -116,8 +116,13 @@ describe('dailySummaryStore', () => {
     expect(useDailySummaryStore.getState().loaded).toBe(true)
   })
 
-  it('fetchRecent loads the recent summaries ascending', async () => {
-    const rows = [{ id: 's1', date: '2026-09-01' }, { id: 's2', date: '2026-09-02' }]
+  it('fetchRecent queries the most-recent 30 rows (descending) and reverses them to ascending', async () => {
+    // The DB returns newest-first (as the store now requests via ascending: false).
+    const rows = [
+      { id: 's3', date: '2026-09-03' },
+      { id: 's2', date: '2026-09-02' },
+      { id: 's1', date: '2026-09-01' },
+    ]
     const chain = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn() }
     chain.select.mockReturnValue(chain)
     chain.eq.mockReturnValue(chain)
@@ -126,7 +131,14 @@ describe('dailySummaryStore', () => {
     ;(supabase.from as jest.Mock).mockImplementation(() => chain)
 
     await useDailySummaryStore.getState().fetchRecent('user-1')
-    expect(useDailySummaryStore.getState().recent).toHaveLength(2)
+
+    expect(chain.order).toHaveBeenCalledWith('date', { ascending: false })
+    expect(chain.limit).toHaveBeenCalledWith(30)
+    expect(useDailySummaryStore.getState().recent.map((r) => r.date)).toEqual([
+      '2026-09-01',
+      '2026-09-02',
+      '2026-09-03',
+    ])
     expect(useDailySummaryStore.getState().error).toBeNull()
   })
 
