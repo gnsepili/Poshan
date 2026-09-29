@@ -84,6 +84,7 @@ export interface DailySummary {
 }
 
 export type ActivityType = 'walk' | 'run' | 'gym' | 'cycle' | 'swim' | 'yoga' | 'other'
+export type ActivitySource = 'manual' | 'health_connect'
 
 export interface InBodyReport {
   id: string
@@ -109,6 +110,7 @@ export interface ActivityLog {
   steps: number
   calories_burned: number
   notes: string
+  source: ActivitySource
   created_at: string
 }
 

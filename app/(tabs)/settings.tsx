@@ -60,6 +60,14 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        <Text className="text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">Integrations</Text>
+        <View className="mb-4">
+          <Pressable className="bg-white rounded-xl border border-gray-100 px-4 py-4" onPress={() => router.push('/health-connect')}>
+            <Text className="text-gray-800 font-semibold">Health Connect</Text>
+            <Text className="text-gray-500 text-xs mt-1">Auto-sync steps, calories, heart rate and workouts (Android)</Text>
+          </Pressable>
+        </View>
+
         <Pressable
           className="bg-red-50 rounded-xl border border-red-100 px-4 py-4 items-center mb-8"
           onPress={signOut}

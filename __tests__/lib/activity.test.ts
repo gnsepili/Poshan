@@ -3,7 +3,7 @@ import { ActivityLog } from '../../types'
 
 const log = (steps: number, calories_burned: number): ActivityLog => ({
   id: 'x', user_id: 'u', logged_at: '2026-09-29T10:00:00Z', activity_type: 'walk',
-  duration_min: 0, steps, calories_burned, notes: '', created_at: '2026-09-29T10:00:00Z',
+  duration_min: 0, steps, calories_burned, notes: '', source: 'manual', created_at: '2026-09-29T10:00:00Z',
 })
 
 describe('activity utils', () => {

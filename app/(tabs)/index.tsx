@@ -6,6 +6,7 @@ import { useMealsStore } from '../../stores/mealsStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { useDailySummaryStore } from '../../stores/dailySummaryStore'
 import { useActivityStore } from '../../stores/activityStore'
+import { useHealthConnectStore } from '../../stores/healthConnectStore'
 import { MealCard } from '../../components/meals/MealCard'
 import { ProgressRing } from '../../components/ui/ProgressRing'
 import { MacroBar } from '../../components/ui/MacroBar'
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const { goals, fetchGoals, error: profileError } = useProfileStore()
   const { summary, loaded: summaryLoaded, fetchOrCreateToday, error: summaryError } = useDailySummaryStore()
   const { todayActivity, fetchTodayActivity, error: activityError } = useActivityStore()
+  const { available: hcAvailable, permissionGranted: hcGranted, todaySteps: hcSteps, checkAvailability, syncNow } = useHealthConnectStore()
   const [lazyError, setLazyError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,12 +47,17 @@ export default function HomeScreen() {
     }
   }, [user, summary, summaryLoaded])
 
+  useEffect(() => { checkAvailability() }, [])
+  useEffect(() => {
+    if (user && hcAvailable && hcGranted) syncNow(user.id)
+  }, [user, hcAvailable, hcGranted])
+
   const totals = sumMeals(meals)
   const calorieTarget = goals?.daily_calorie_target ?? 2000
   const proteinTarget = goals?.daily_protein_g ?? 150
   const carbsTarget = goals?.daily_carbs_g ?? 250
   const fatTarget = goals?.daily_fat_g ?? 70
-  const stepsToday = sumSteps(todayActivity)
+  const stepsToday = Math.max(sumSteps(todayActivity), hcSteps)
   const stepsTarget = goals?.daily_steps_target ?? 8000
   const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError ?? lazyError
 

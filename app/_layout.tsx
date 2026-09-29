@@ -62,6 +62,7 @@ export default function RootLayout() {
           <Stack.Screen name="inbody" />
           <Stack.Screen name="activity" />
           <Stack.Screen name="progress" />
+          <Stack.Screen name="health-connect" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

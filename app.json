@@ -32,7 +32,11 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_EXERCISE"
       ]
     },
     "web": {
@@ -51,7 +55,8 @@
         {
           "photosPermission": "Poshan AI accesses your photos to log meal images."
         }
-      ]
+      ],
+      "react-native-health-connect"
     ],
     "extra": {
       "router": {},
