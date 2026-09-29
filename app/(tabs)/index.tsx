@@ -65,6 +65,18 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <View className="flex-row px-4 gap-3 mb-4">
+        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/activity')}>
+          <Text className="text-gray-700 font-semibold">Log Activity</Text>
+        </Pressable>
+        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/inbody')}>
+          <Text className="text-gray-700 font-semibold">Add InBody</Text>
+        </Pressable>
+        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/progress')}>
+          <Text className="text-gray-700 font-semibold">Progress</Text>
+        </Pressable>
+      </View>
+
       <View className="mx-4 mb-4 bg-white rounded-xl px-4 py-4 border border-gray-100">
         <MacroBar label="Carbs" consumed={totals.carbs} target={carbsTarget} color="#7c3aed" />
         <MacroBar label="Fat" consumed={totals.fat} target={fatTarget} color="#d97706" />
