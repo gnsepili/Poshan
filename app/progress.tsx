@@ -50,21 +50,28 @@ export default function ProgressScreen() {
       {adherenceError && <Text className="text-red-500 mx-6 mt-4">{adherenceError}</Text>}
       {loading && <ActivityIndicator className="mt-8" color="#16a34a" />}
 
-      {!loading && reports.length < 2 ? (
-        <View className="flex-1 items-center justify-center px-8 py-20">
-          <Text className="text-gray-400 text-center">Add at least 2 InBody scans to see your trends over time.</Text>
-          <Pressable className="bg-green-600 rounded-lg py-3 px-6 mt-4" onPress={() => router.push('/inbody')}>
-            <Text className="text-white font-semibold">Add a scan</Text>
-          </Pressable>
-        </View>
-      ) : (
+      {!loading && (
+        reports.length < 2 ? (
+          <View className="flex-1 items-center justify-center px-8 py-20">
+            <Text className="text-gray-400 text-center">Add at least 2 InBody scans to see your trends over time.</Text>
+            <Pressable className="bg-green-600 rounded-lg py-3 px-6 mt-4" onPress={() => router.push('/inbody')}>
+              <Text className="text-white font-semibold">Add a scan</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View className="px-6 pt-4">
+            {charts.map((c) => (
+              <View key={c.title} className="bg-white rounded-xl p-4 mb-4 border border-gray-100">
+                <Text className="font-semibold text-gray-700 mb-2">{c.title}</Text>
+                <LineChart data={c.data} color={c.color} />
+              </View>
+            ))}
+          </View>
+        )
+      )}
+
+      {!loading && (
         <View className="px-6 pt-4">
-          {charts.map((c) => (
-            <View key={c.title} className="bg-white rounded-xl p-4 mb-4 border border-gray-100">
-              <Text className="font-semibold text-gray-700 mb-2">{c.title}</Text>
-              <LineChart data={c.data} color={c.color} />
-            </View>
-          ))}
           <View className="bg-white rounded-xl p-4 mb-4 border border-gray-100">
             <Text className="font-semibold text-gray-700 mb-2">Calorie adherence (last 30 days)</Text>
             <BarChart data={adherence} />
