@@ -44,15 +44,22 @@ export const useAuthStore = create<AuthState>()(
     },
 
     signOut: async () => {
-      await supabase.auth.signOut()
-      set((s) => { s.session = null; s.user = null })
+      set((s) => { s.loading = true; s.error = null })
+      const { error } = await supabase.auth.signOut()
+      set((s) => {
+        s.loading = false
+        s.session = null
+        s.user = null
+        s.error = error?.message ?? null
+      })
     },
 
     initialize: async () => {
-      const { data } = await supabase.auth.getSession()
+      const { data, error } = await supabase.auth.getSession()
       set((s) => {
         s.session = data.session
         s.user = data.session?.user ?? null
+        s.error = error?.message ?? null
       })
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         set((s) => { s.session = session; s.user = session?.user ?? null })

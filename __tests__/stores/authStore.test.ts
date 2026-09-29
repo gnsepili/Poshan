@@ -37,4 +37,43 @@ describe('authStore', () => {
     expect(useAuthStore.getState().session).toEqual(mockSession)
     expect(useAuthStore.getState().error).toBeNull()
   })
+
+  it('sets error on failed sign out', async () => {
+    ;(supabase.auth.signOut as jest.Mock).mockResolvedValue({
+      error: { message: 'Network error' },
+    })
+    await useAuthStore.getState().signOut()
+    expect(useAuthStore.getState().error).toBe('Network error')
+    expect(useAuthStore.getState().session).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
+  })
+
+  it('clears error on successful sign out', async () => {
+    useAuthStore.setState({ error: 'stale error' })
+    ;(supabase.auth.signOut as jest.Mock).mockResolvedValue({ error: null })
+    await useAuthStore.getState().signOut()
+    expect(useAuthStore.getState().error).toBeNull()
+    expect(useAuthStore.getState().session).toBeNull()
+    expect(useAuthStore.getState().user).toBeNull()
+  })
+
+  it('sets error when session restore fails on initialize', async () => {
+    ;(supabase.auth.getSession as jest.Mock).mockResolvedValue({
+      data: { session: null },
+      error: { message: 'Session expired' },
+    })
+    await useAuthStore.getState().initialize()
+    expect(useAuthStore.getState().error).toBe('Session expired')
+    expect(useAuthStore.getState().session).toBeNull()
+  })
+
+  it('clears error on successful initialize', async () => {
+    useAuthStore.setState({ error: 'stale error' })
+    ;(supabase.auth.getSession as jest.Mock).mockResolvedValue({
+      data: { session: null },
+      error: null,
+    })
+    await useAuthStore.getState().initialize()
+    expect(useAuthStore.getState().error).toBeNull()
+  })
 })
