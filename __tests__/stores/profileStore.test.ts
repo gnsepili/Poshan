@@ -45,6 +45,13 @@ describe('profileStore', () => {
     expect(useProfileStore.getState().profile).toEqual(mockProfile)
   })
 
+  it('leaves profile null and error null when a new user has no profile row yet (maybeSingle no-rows)', async () => {
+    mockFrom(null, null)
+    await useProfileStore.getState().fetchProfile('user-1')
+    expect(useProfileStore.getState().profile).toBeNull()
+    expect(useProfileStore.getState().error).toBeNull()
+  })
+
   it('sets error when upsertProfile fails', async () => {
     mockFrom(null, { message: 'upsert failed' })
     await useProfileStore.getState().upsertProfile({ id: 'user-1', age: 31 })

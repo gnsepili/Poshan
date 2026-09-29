@@ -2,7 +2,7 @@ import { Meal } from '../../types'
 
 export function calcProgress(consumed: number, target: number): number {
   if (target === 0) return 0
-  return Math.min(100, Math.round((consumed / target) * 100))
+  return Math.max(0, Math.min(100, Math.round((consumed / target) * 100)))
 }
 
 export function sumMeals(meals: Meal[]) {

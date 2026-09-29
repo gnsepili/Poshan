@@ -57,6 +57,7 @@ export interface ChatMessage {
   role: ChatRole
   content: string
   tool_calls: unknown | null
+  context_snapshot: unknown | null
   created_at: string
 }
 

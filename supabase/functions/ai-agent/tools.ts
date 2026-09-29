@@ -125,7 +125,14 @@ export async function executeTool(
       .limit(1)
       .maybeSingle()
     if (!existing) return 'No existing goals to update. The user should set goals in onboarding first.'
-    const { error } = await supabase.from('goals').update({ ...input }).eq('id', existing.id)
+    // Goals are append-only / latest-wins: insert a new row rather than mutating
+    // the existing one, mirroring profileStore.upsertGoals on the client.
+    const { id: _id, created_at: _createdAt, ...existingWithoutIdAndTimestamp } = existing
+    const { error } = await supabase.from('goals').insert({
+      ...existingWithoutIdAndTimestamp,
+      ...input,
+      user_id: userId,
+    })
     if (error) return `Error updating goals: ${error.message}`
     return 'Goals updated successfully.'
   }

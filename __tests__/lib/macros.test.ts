@@ -14,6 +14,10 @@ describe('macros utils', () => {
     expect(calcProgress(1000, 2000)).toBe(50)
   })
 
+  it('calcProgress clamps negative consumed values to 0', () => {
+    expect(calcProgress(-500, 2000)).toBe(0)
+  })
+
   it('sumMeals totals calories from meals array', () => {
     const meals = [{ total_calories: 400 }, { total_calories: 600 }] as Meal[]
     expect(sumMeals(meals).calories).toBe(1000)

@@ -19,7 +19,7 @@ export default function ChatScreen() {
     if (!input.trim() || !user) return
     const text = input.trim()
     setInput('')
-    await sendMessage(user.id, text)
+    await sendMessage(text)
     if (useChatStore.getState().error) setInput(text)
     listRef.current?.scrollToEnd()
   }

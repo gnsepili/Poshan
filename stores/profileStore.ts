@@ -27,14 +27,17 @@ export const useProfileStore = create<ProfileState>()(
 
     fetchProfile: async (userId) => {
       set((s) => { s.loading = true; s.error = null })
+      // A brand-new user has no profile row yet; that's not an error condition,
+      // so use maybeSingle() and treat a null result as "no profile yet" —
+      // mirrors the null-tolerant pattern used by fetchGoals.
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       set((s) => {
         s.loading = false
-        s.profile = error ? null : (data as Profile)
+        s.profile = error ? null : (data as Profile | null)
         s.error = error?.message ?? null
       })
     },

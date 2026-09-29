@@ -11,7 +11,7 @@ interface ChatState {
   conversationId: string | null
   loading: boolean
   error: string | null
-  sendMessage: (userId: string, content: string) => Promise<void>
+  sendMessage: (content: string) => Promise<void>
   loadHistory: (userId: string) => Promise<void>
 }
 
@@ -22,7 +22,7 @@ export const useChatStore = create<ChatState>()(
     loading: false,
     error: null,
 
-    sendMessage: async (userId, content) => {
+    sendMessage: async (content) => {
       const userMsg: ChatHistoryMessage = {
         id: crypto.randomUUID(),
         conversation_id: get().conversationId ?? '',
@@ -62,11 +62,41 @@ export const useChatStore = create<ChatState>()(
         s.loading = true
         s.error = null
       })
+      // Scope history to a single conversation: find the user's most recent
+      // conversation, then load only that conversation's messages (bounded).
+      // Loading every past conversation merged into one thread would grow
+      // unbounded and mix unrelated conversations together.
+      const { data: latest, error: latestError } = await supabase
+        .from('chat_messages')
+        .select('conversation_id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestError) {
+        set((s) => {
+          s.loading = false
+          s.error = latestError.message
+        })
+        return
+      }
+
+      if (!latest) {
+        set((s) => {
+          s.loading = false
+          s.error = null
+        })
+        return
+      }
+
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
-        .eq('user_id', userId)
+        .eq('conversation_id', latest.conversation_id)
         .order('created_at', { ascending: true })
+        .limit(50)
+
       set((s) => {
         s.loading = false
         s.error = error?.message ?? null
@@ -78,8 +108,7 @@ export const useChatStore = create<ChatState>()(
             content: m.content,
             created_at: m.created_at,
           }))
-          const last = data[data.length - 1]
-          if (last) s.conversationId = last.conversation_id
+          s.conversationId = latest.conversation_id
         }
       })
     },
