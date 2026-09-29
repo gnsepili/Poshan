@@ -180,4 +180,50 @@ describe('mealsStore', () => {
     expect((insert.mock.calls[0][0] as { photo_url: string }).photo_url).toBe('https://cdn/a.jpg')
     expect(useMealsStore.getState().pendingCount).toBe(0)
   })
+
+  it('persists the uploaded photo_url (clearing the local URI) before attempting the insert, so a crash right after upload never causes a re-upload on retry', async () => {
+    const queued = [
+      { id: 'a', user_id: 'u1', meal_type: 'lunch', description: 'a', total_calories: 1, protein_g: 1, carbs_g: 1, fat_g: 1, fiber_g: 0, photo_local_uri: 'file:///a.jpg', queued_at: 't1' },
+    ]
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(queued))
+    const upload = jest.fn().mockResolvedValue({ error: null })
+    const getPublicUrl = jest.fn().mockReturnValue({ data: { publicUrl: 'https://cdn/a.jpg' } })
+    ;(supabase.storage.from as jest.Mock).mockReturnValue({ upload, getPublicUrl })
+    const insert = jest.fn().mockResolvedValue({ error: null })
+    ;(supabase.from as jest.Mock).mockReturnValue({ insert })
+
+    await useMealsStore.getState().flushQueue()
+
+    // The photo-uploaded persist (setItem) must happen strictly before the insert call —
+    // that's what makes a crash between "photo uploaded" and "meal removed" safe to retry
+    // without re-uploading.
+    const firstSetItemOrder = (AsyncStorage.setItem as jest.Mock).mock.invocationCallOrder[0]
+    const insertOrder = insert.mock.invocationCallOrder[0]
+    expect(firstSetItemOrder).toBeLessThan(insertOrder)
+    // And that persisted intermediate write must carry the remote photo_url with no local URI.
+    const firstWrite = JSON.parse((AsyncStorage.setItem as jest.Mock).mock.calls[0][1])
+    expect(firstWrite[0].photo_url).toBe('https://cdn/a.jpg')
+    expect(firstWrite[0].photo_local_uri).toBeUndefined()
+  })
+
+  it('a crash-recovered queued item (photo already uploaded, local URI cleared) is drained via duplicate-key success without re-uploading', async () => {
+    const queued = [
+      { id: 'a', user_id: 'u1', meal_type: 'lunch', description: 'a', total_calories: 1, protein_g: 1, carbs_g: 1, fat_g: 1, fiber_g: 0, photo_url: 'https://cdn/a.jpg', queued_at: 't1' },
+    ]
+    ;(AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(queued))
+    const upload = jest.fn()
+    const getPublicUrl = jest.fn()
+    ;(supabase.storage.from as jest.Mock).mockReturnValue({ upload, getPublicUrl })
+    const insert = jest.fn().mockResolvedValue({ error: { message: 'duplicate key value violates unique constraint "meals_pkey"' } })
+    ;(supabase.from as jest.Mock).mockReturnValue({ insert })
+
+    await useMealsStore.getState().flushQueue()
+
+    expect(upload).not.toHaveBeenCalled()
+    expect(insert).toHaveBeenCalledTimes(1)
+    expect((insert.mock.calls[0][0] as { photo_url: string }).photo_url).toBe('https://cdn/a.jpg')
+    const lastWrite = (AsyncStorage.setItem as jest.Mock).mock.calls.at(-1)?.[1]
+    expect(JSON.parse(lastWrite)).toEqual([])
+    expect(useMealsStore.getState().pendingCount).toBe(0)
+  })
 })

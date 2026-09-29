@@ -1,4 +1,4 @@
-import { enqueueMeal, removeMeal, QueuedMeal } from '../../lib/utils/mealQueue'
+import { enqueueMeal, removeMeal, updateMeal, QueuedMeal } from '../../lib/utils/mealQueue'
 
 const meal = (id: string): QueuedMeal => ({
   id, user_id: 'u1', meal_type: 'lunch', description: `m${id}`,
@@ -38,5 +38,26 @@ describe('mealQueue', () => {
     q = removeMeal(q, '2')
     q = removeMeal(q, '3')
     expect(q.map((m) => m.id)).toEqual(['1'])
+  })
+
+  it('updateMeal patches a matching item in place, preserving order and other items', () => {
+    const q = [meal('1'), meal('2'), meal('3')]
+    const patched = updateMeal(q, '2', { photo_url: 'https://cdn/2.jpg', photo_local_uri: undefined })
+    expect(patched.map((m) => m.id)).toEqual(['1', '2', '3'])
+    expect(patched[1]).toEqual({ ...meal('2'), photo_url: 'https://cdn/2.jpg', photo_local_uri: undefined })
+    expect(patched[0]).toEqual(meal('1'))
+    expect(patched[2]).toEqual(meal('3'))
+  })
+
+  it('updateMeal on an absent id is a no-op', () => {
+    const q = [meal('1')]
+    expect(updateMeal(q, 'x', { photo_url: 'https://cdn/x.jpg' })).toEqual(q)
+  })
+
+  it('updateMeal can clear a local URI once its remote photo_url is known, so a crash-recovered retry never re-uploads', () => {
+    const q = [{ ...meal('1'), photo_local_uri: 'file:///1.jpg' }]
+    const patched = updateMeal(q, '1', { photo_url: 'https://cdn/1.jpg', photo_local_uri: undefined })
+    expect(patched[0].photo_local_uri).toBeUndefined()
+    expect(patched[0].photo_url).toBe('https://cdn/1.jpg')
   })
 })

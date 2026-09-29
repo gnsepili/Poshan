@@ -11,6 +11,10 @@ export interface QueuedMeal {
   fat_g: number
   fiber_g: number
   photo_local_uri?: string
+  // Set once a queued local photo has been uploaded (before the insert is attempted), and
+  // photo_local_uri cleared — so a crash between upload and insert-removal never re-uploads
+  // on the next flush; it reuses this already-uploaded remote URL instead.
+  photo_url?: string
   queued_at: string
 }
 
@@ -24,4 +28,10 @@ export function enqueueMeal(queue: QueuedMeal[], meal: QueuedMeal): QueuedMeal[]
 // Remove a meal by id after a successful insert.
 export function removeMeal(queue: QueuedMeal[], id: string): QueuedMeal[] {
   return queue.filter((m) => m.id !== id)
+}
+
+// Patch a queued item in place (e.g. persist an uploaded photo_url + clear photo_local_uri
+// before attempting the insert), preserving order. A no-op if the id isn't present.
+export function updateMeal(queue: QueuedMeal[], id: string, patch: Partial<QueuedMeal>): QueuedMeal[] {
+  return queue.map((m) => (m.id === id ? { ...m, ...patch } : m))
 }

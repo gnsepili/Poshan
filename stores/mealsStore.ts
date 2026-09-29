@@ -6,7 +6,7 @@ import { decode } from 'base64-arraybuffer'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/database.types'
 import { Meal } from '../types'
-import { QueuedMeal, enqueueMeal, removeMeal } from '../lib/utils/mealQueue'
+import { QueuedMeal, enqueueMeal, removeMeal, updateMeal } from '../lib/utils/mealQueue'
 
 type MealInsert = Database['public']['Tables']['meals']['Insert']
 
@@ -140,11 +140,22 @@ export const useMealsStore = create<MealsState>()(
       let q = await readQueue()
       for (const item of q) {
         try {
-          const photo_url = await uploadQueuedPhoto(item)
-          if (item.photo_local_uri && !photo_url) {
-            // Photo upload failed: keep the meal queued rather than inserting it with a
-            // broken/missing photo. Stop here so ordering + no-loss is preserved.
-            break
+          // Reuse an already-uploaded remote URL if a prior flush got this far before dying
+          // (see the persist-before-insert write below) — never re-upload in that case.
+          let photo_url = item.photo_url
+          if (!photo_url && item.photo_local_uri) {
+            const uploaded = await uploadQueuedPhoto(item)
+            if (!uploaded) {
+              // Photo upload failed: keep the meal queued rather than inserting it with a
+              // broken/missing photo. Stop here so ordering + no-loss is preserved.
+              break
+            }
+            photo_url = uploaded
+            // Persist the uploaded URL (and drop the now-redundant local URI) BEFORE the
+            // insert: if the process dies between here and the insert's removeMeal below,
+            // the next flush sees photo_url already set and skips the upload entirely.
+            q = updateMeal(q, item.id, { photo_url, photo_local_uri: undefined })
+            await writeQueue(q)
           }
           const { error } = await supabase.from('meals').insert({
             id: item.id,
