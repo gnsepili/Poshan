@@ -53,6 +53,24 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage: {
+        Row: {
+          count: number
+          date: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          date?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
