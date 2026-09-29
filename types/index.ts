@@ -111,3 +111,54 @@ export interface ActivityLog {
   notes: string
   created_at: string
 }
+
+export interface MealPlanMeal {
+  meal_type: MealType
+  description: string
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+}
+
+export interface MealPlanDay {
+  day: string
+  meals: MealPlanMeal[]
+}
+
+export interface MealPlanJson {
+  days: MealPlanDay[]
+}
+
+export interface MealPlan {
+  id: string
+  user_id: string
+  week_start_date: string
+  plan_json: MealPlanJson
+  created_at: string
+}
+
+export interface WorkoutExercise {
+  name: string
+  sets: number
+  reps: string
+  notes: string
+}
+
+export interface WorkoutPlanDay {
+  day: string
+  focus: string
+  exercises: WorkoutExercise[]
+}
+
+export interface WorkoutPlanJson {
+  days: WorkoutPlanDay[]
+}
+
+export interface WorkoutPlan {
+  id: string
+  user_id: string
+  week_start_date: string
+  plan_json: WorkoutPlanJson
+  created_at: string
+}

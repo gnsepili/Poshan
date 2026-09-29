@@ -218,6 +218,30 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plans: {
+        Row: {
+          created_at: string
+          id: string
+          plan_json: Json
+          user_id: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_json: Json
+          user_id: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_json?: Json
+          user_id?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       meals: {
         Row: {
           ai_suggestions: string | null
@@ -308,6 +332,30 @@ export type Database = {
           sex?: string
           treatment_duration_months?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      workout_plans: {
+        Row: {
+          created_at: string
+          id: string
+          plan_json: Json
+          user_id: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_json: Json
+          user_id: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_json?: Json
+          user_id?: string
+          week_start_date?: string
         }
         Relationships: []
       }
