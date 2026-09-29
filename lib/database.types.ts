@@ -149,6 +149,57 @@ export type Database = {
         }
         Relationships: []
       }
+      error_logs: {
+        Row: {
+          context: string
+          created_at: string
+          id: string
+          message: string
+          stack: string | null
+          user_id: string | null
+        }
+        Insert: {
+          context: string
+          created_at?: string
+          id?: string
+          message: string
+          stack?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          context?: string
+          created_at?: string
+          id?: string
+          message?: string
+          stack?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          props: Json
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          props?: Json
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          props?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string
