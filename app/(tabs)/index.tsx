@@ -5,10 +5,12 @@ import { useAuthStore } from '../../stores/authStore'
 import { useMealsStore } from '../../stores/mealsStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { useDailySummaryStore } from '../../stores/dailySummaryStore'
+import { useActivityStore } from '../../stores/activityStore'
 import { MealCard } from '../../components/meals/MealCard'
 import { ProgressRing } from '../../components/ui/ProgressRing'
 import { MacroBar } from '../../components/ui/MacroBar'
 import { calcProgress, sumMeals } from '../../lib/utils/macros'
+import { sumSteps } from '../../lib/utils/activity'
 
 export default function HomeScreen() {
   const router = useRouter()
@@ -16,12 +18,14 @@ export default function HomeScreen() {
   const { meals, fetchTodayMeals, error: mealsError } = useMealsStore()
   const { goals, fetchGoals, error: profileError } = useProfileStore()
   const { summary, fetchOrCreateToday, error: summaryError } = useDailySummaryStore()
+  const { todayActivity, fetchTodayActivity, error: activityError } = useActivityStore()
 
   useEffect(() => {
     if (user) {
       fetchTodayMeals(user.id)
       fetchGoals(user.id)
       fetchOrCreateToday(user.id)
+      fetchTodayActivity(user.id)
     }
   }, [user])
 
@@ -30,7 +34,9 @@ export default function HomeScreen() {
   const proteinTarget = goals?.daily_protein_g ?? 150
   const carbsTarget = goals?.daily_carbs_g ?? 250
   const fatTarget = goals?.daily_fat_g ?? 70
-  const errorMessage = mealsError ?? profileError ?? summaryError
+  const stepsToday = sumSteps(todayActivity)
+  const stepsTarget = goals?.daily_steps_target ?? 8000
+  const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
@@ -40,7 +46,7 @@ export default function HomeScreen() {
         <View className="flex-row justify-around">
           <ProgressRing percentage={calcProgress(totals.calories, calorieTarget)} label="Calories" value={`${totals.calories}`} color="#16a34a" />
           <ProgressRing percentage={calcProgress(totals.protein, proteinTarget)} label="Protein" value={`${Math.round(totals.protein)}g`} color="#2563eb" />
-          <ProgressRing percentage={0} label="Steps" value="—" color="#d97706" />
+          <ProgressRing percentage={calcProgress(stepsToday, stepsTarget)} label="Steps" value={`${stepsToday}`} color="#d97706" />
         </View>
       </View>
 
