@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { View, Pressable, Image, ActivityIndicator, Text } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system/legacy'
+import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -24,9 +26,11 @@ export function MealPhotoCapture({ onUploaded }: Props) {
     setUploadError(null)
 
     const fileName = `${user.id}/${Date.now()}.jpg`
-    const response = await fetch(asset.uri)
-    const blob = await response.blob()
-    const { error } = await supabase.storage.from('meal-photos').upload(fileName, blob, { contentType: 'image/jpeg' })
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
+    const arrayBuffer = decode(base64)
+    const { error } = await supabase.storage
+      .from('meal-photos')
+      .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
     setUploading(false)
     if (error) {
       setUploadError(error.message)
