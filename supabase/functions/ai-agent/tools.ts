@@ -201,7 +201,7 @@ export async function executeTool(
   }
 
   if (name === 'get_inbody_history') {
-    const limit = typeof input.limit === 'number' ? input.limit : 10
+    const limit = Math.min(Math.max(1, typeof input.limit === 'number' ? input.limit : 10), 50)
     const { data, error } = await supabase
       .from('inbody_reports')
       .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, visceral_fat, bmr, ai_notes')

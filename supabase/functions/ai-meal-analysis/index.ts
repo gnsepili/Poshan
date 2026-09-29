@@ -28,6 +28,9 @@ Deno.serve(async (req) => {
     // Accept either a storage path ("<userId>/<file>.jpg") or a full URL containing it.
     const raw: string = body.photo_path ?? body.photo_url ?? ''
     const path = raw.includes('/meal-photos/') ? raw.split('/meal-photos/')[1] : raw
+    if (path.split('/')[0] !== userData.user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const { data: signed, error: signErr } = await supabase.storage.from('meal-photos').createSignedUrl(path, 120)

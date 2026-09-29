@@ -39,6 +39,9 @@ Deno.serve(async (req) => {
     if (!path) {
       return new Response(JSON.stringify({ error: 'Missing photo_url' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
+    if (path.split('/')[0] !== userData.user.id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const { data: signed, error: signErr } = await supabase.storage.from('inbody-photos').createSignedUrl(path, 120)
