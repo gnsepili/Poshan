@@ -23,6 +23,7 @@ export type Database = {
           id: string
           logged_at: string
           notes: string
+          source: string
           steps: number
           user_id: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           logged_at?: string
           notes?: string
+          source?: string
           steps?: number
           user_id: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           id?: string
           logged_at?: string
           notes?: string
+          source?: string
           steps?: number
           user_id?: string
         }
