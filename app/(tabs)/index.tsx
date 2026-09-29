@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuthStore } from '../../stores/authStore'
@@ -11,6 +11,11 @@ import { ProgressRing } from '../../components/ui/ProgressRing'
 import { MacroBar } from '../../components/ui/MacroBar'
 import { calcProgress, sumMeals } from '../../lib/utils/macros'
 import { sumSteps } from '../../lib/utils/activity'
+import { generateDailySummary } from '../../lib/api/dailySummary'
+import { shouldGenerateCoachNote, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
+
+// Fires the lazy coach-note generation at most once per app session per calendar day.
+let coachNoteAttemptDate: string | null = null
 
 export default function HomeScreen() {
   const router = useRouter()
@@ -19,6 +24,7 @@ export default function HomeScreen() {
   const { goals, fetchGoals, error: profileError } = useProfileStore()
   const { summary, fetchOrCreateToday, error: summaryError } = useDailySummaryStore()
   const { todayActivity, fetchTodayActivity, error: activityError } = useActivityStore()
+  const [lazyError, setLazyError] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -29,6 +35,16 @@ export default function HomeScreen() {
     }
   }, [user])
 
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    if (user && shouldGenerateCoachNote(summary, coachNoteAttemptDate, today)) {
+      coachNoteAttemptDate = today
+      generateDailySummary()
+        .then(() => fetchOrCreateToday(user.id))
+        .catch((e) => setLazyError(e instanceof Error ? e.message : String(e)))
+    }
+  }, [user, summary])
+
   const totals = sumMeals(meals)
   const calorieTarget = goals?.daily_calorie_target ?? 2000
   const proteinTarget = goals?.daily_protein_g ?? 150
@@ -36,7 +52,7 @@ export default function HomeScreen() {
   const fatTarget = goals?.daily_fat_g ?? 70
   const stepsToday = sumSteps(todayActivity)
   const stepsTarget = goals?.daily_steps_target ?? 8000
-  const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError
+  const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError ?? lazyError
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
@@ -86,6 +102,13 @@ export default function HomeScreen() {
         <View className="mx-4 mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
           <Text className="text-xs text-amber-700">{summary.ai_coach_note}</Text>
         </View>
+      )}
+
+      {shouldShowLowFuelPrompt(totals.calories, calorieTarget, new Date()) && (
+        <Pressable className="mx-4 mb-4 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3" onPress={() => router.push('/(tabs)/chat')}>
+          <Text className="text-orange-800 font-semibold text-sm">Not enough food today</Text>
+          <Text className="text-orange-700 text-xs mt-1">You are well under your calorie target — tap to ask the coach for a meal suggestion.</Text>
+        </Pressable>
       )}
 
       <View className="px-4">
