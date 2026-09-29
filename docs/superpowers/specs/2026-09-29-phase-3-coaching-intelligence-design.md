@@ -1,124 +1,158 @@
 # Phase 3 — Coaching Intelligence: Design Spec
 
-**Status:** Approved design (2026-09-29). Refines the app-level spec and the
-Phase 3 outline for execution.
+**Status:** Approved design (2026-09-29). Refines the app-level spec
+`2026-09-29-health-coach-app-design.md` for Phase 3 execution.
 
 **Parent spec:** `docs/superpowers/specs/2026-09-29-health-coach-app-design.md`
 **Builds on:** Phases 1 & 2 (complete on `master`).
 
 ## Goal
 
-Make the coach proactive and planful: a daily coach note + AI daily goals,
-AI-generated weekly meal and workout plans, a progress analytics screen, and
-in-chat meal suggestions — all reasoning over the health record built in
-Phases 1–2 (profile, goals, meals, activity, InBody).
+Make the coach proactive and forward-looking: a daily morning coach note +
+AI daily goals, AI-generated weekly meal and workout plans, a progress
+analytics view, and an in-context meal-suggestion capability.
 
 ## Scope decisions (approved)
 
-- **Daily coach note is generated LAZILY on app-open, not by cron.** When the
-  app opens and today's `daily_summaries` row has no `ai_coach_note`, the
-  client calls a `generate-daily-summary` edge function that rolls up recent
-  meals/activity, generates today's `ai_daily_goals` + `ai_coach_note`, and
-  upserts today's row. No `pg_cron`/`pg_net`, no timezone skew, no work for
-  inactive users. (There's no push until Phase 4, so lazy is UX-equivalent.)
-  The function is idempotent — a no-op if today's note already exists.
-- **Charts use `react-native-svg`** (extend the Phase 2 `LineChart`; add a
-  small `BarChart` for calorie adherence). **Do NOT add `victory-native`** or
-  any chart library. (Overrides the outline's offhand `victory-native` note.)
-- **Navigation: add ONE "Coach" tab** (Home / Meals / Chat / Coach / Settings
-  = 5 tabs). The Coach tab hosts the weekly Meal Plan, Workout Plan, and an
-  Analytics section. The existing Phase 2 `app/progress.tsx` (InBody timeline)
-  is linked from the Coach tab (and stays reachable from Home); Analytics
-  reuses `LineChart` and the existing series logic — do NOT duplicate the
-  weight/body-fat/muscle charts.
-- **Plan generation is fully agentic.** `generate_meal_plan` and
-  `generate_workout_plan` are `ai-agent` tools; the Coach tab's "Regenerate"
-  button sends a structured request through the SAME agent path chat uses
-  (one code path; matches the app's "UI and chat share the same functions"
-  philosophy). No separate generation endpoint.
-- **Goals remain append-only / latest-wins** (unchanged). `ai_daily_goals`
-  lives on the `daily_summaries` row (per-day snapshot), distinct from the
-  append-only `goals` table (the standing targets).
+- **Morning coach note = pg_cron (6am) + lazy fallback.** A `pg_cron` job
+  invokes the `generate-daily-summary` edge function daily; if the cron did
+  not run (or today's row lacks `ai_coach_note`), the client lazily invokes
+  it for the current user on app open. Both paths hit the same function.
+- **Plans get a new bottom tab** → tabs become **Home / Meals / Plans /
+  Chat / Settings** (5). This intentionally supersedes the Phase-2 "keep 4
+  tabs" guideline because plans are a primary, frequently-revisited surface.
+- **Charts stay `react-native-svg`, hand-built.** Reuse the Phase-2
+  `LineChart`; ADD a `BarChart` for calorie adherence. **Do NOT add
+  `victory-native`** (the outline's mention is superseded — no charting
+  library, per the standing ruling). The analytics view EXTENDS the existing
+  `app/progress.tsx` (do not create a second progress screen/tab).
+- **Goals remain append-only / latest-wins.** Any goal write inserts a new
+  row.
+- **Edge functions:** `verify_jwt: true`, OpenAI `gpt-4o`, user from JWT.
+- **No new npm dependency** is required (react-native-svg, expo-*, etc. all
+  present).
 
 ## Data model (new)
 
 Applied to remote `ggjrtgowmauoimpvficl` via Supabase MCP AND committed as
-`supabase/migrations/<ts>_phase3_coaching.sql`.
+`supabase/migrations/<ts>_phase3_coaching_intelligence.sql`.
 
 ### `meal_plans`
 - `id uuid pk default uuid_generate_v4()`
 - `user_id uuid not null references auth.users(id) on delete cascade`
 - `week_start_date date not null`
-- `plan_json jsonb not null`  — `{ days: [{ date|weekday, meals: [{ meal_type, name, kcal, protein_g, carbs_g, fat_g }] }] }`
+- `plan_json jsonb not null` — shape:
+  `{ days: [ { day: "Mon"|"Tue"|…, meals: [ { meal_type, description, calories, protein_g, carbs_g, fat_g } ] } ] }`
 - `created_at timestamptz not null default now()`
-- RLS `auth.uid() = user_id`. Latest-per-user by `created_at` (append-only, like goals).
+- RLS `auth.uid() = user_id`. Latest-per-week-start wins (append-only, like goals).
 
 ### `workout_plans`
-- Same shape; `plan_json` — `{ days: [{ weekday, focus, exercises: [{ name, sets, reps, notes }] }] }`.
-- RLS `auth.uid() = user_id`. Latest-per-user by `created_at`.
+- same columns; `plan_json` shape:
+  `{ days: [ { day, focus, exercises: [ { name, sets, reps, notes } ] } ] }`
+- RLS `auth.uid() = user_id`. Append-only, latest wins.
 
-Both are append-only/latest-wins: regeneration inserts a new row; reads take
-the most recent by `created_at`.
+### `daily_summaries` (existing) — now actively written
+- `generate-daily-summary` upserts today's row with `ai_daily_goals` (jsonb:
+  `{calories, protein_g, carbs_g, fat_g, steps, workout_suggestion}`) and
+  `ai_coach_note` (text). `unique(user_id, date)` already exists → upsert on
+  conflict `(user_id, date)`.
 
 ## Edge Function — `generate-daily-summary`
 
-- Deployed via CLI/MCP; source `supabase/functions/generate-daily-summary/index.ts`.
-- `verify_jwt: true`; user from JWT; enforce identity (never body user_id).
-- On call: compute today (server date); if a `daily_summaries` row for today
-  already has a non-null `ai_coach_note`, return it unchanged (idempotent).
-  Otherwise: sum recent meals + activity + read latest goals/InBody, call
-  gpt-4o to produce `{ ai_daily_goals: {calories, protein_g, carbs_g, fat_g,
-  steps, workout_suggestion}, ai_coach_note: string }`, upsert today's
-  `daily_summaries` row (unique on `user_id,date`), and return it.
-- Response `{ ai_daily_goals, ai_coach_note, date }`. Errors `{ error }` + status.
+Deployed via MCP/CLI; source at
+`supabase/functions/generate-daily-summary/index.ts`. Two invocation modes:
 
-## Agent upgrade (`ai-agent`) — new tools
+- **Cron mode:** invoked by `pg_cron` via `pg_net` with header
+  `x-cron-secret: <CRON_SECRET>` (a new Supabase function secret) plus the
+  service-role bearer (passes the gateway). When the secret matches, the
+  function iterates all `profiles` (service-role client) and generates for
+  each user.
+- **User (lazy) mode:** invoked by the client with the user's JWT; derives
+  the user via `authClient.auth.getUser()` and generates for that one user.
+  If neither a valid cron secret nor a valid user JWT is present → 401.
 
-Add to `tools.ts` + route in `executeTool` (all derive from JWT `userId`):
-- `generate_meal_plan(days=7, emphasis?)` — build a plan aligned to the latest
-  goals/macros, `.insert()` a `meal_plans` row (append-only), return a summary.
-- `generate_workout_plan(days=7, emphasis?)` — from goals + activity level +
-  latest InBody, `.insert()` a `workout_plans` row, return a summary.
-- `get_meal_suggestion()` — compute remaining macros for today (goal − consumed)
-  and suggest one concrete meal fitting them.
-- `get_progress_report(range_days=30)` — return trend data (weight/body-fat/
-  muscle from `inbody_reports`; calorie adherence from meals vs goal) for the
-  chat coach.
-Extend `context.ts` to mention whether a current meal/workout plan exists.
-Redeploy `ai-agent` (v4).
+For each target user the function:
+1. Rolls up **yesterday's** meals + activity into that day's
+   `daily_summaries` row (calories, macros, steps).
+2. Reads recent trend (last ~7 daily summaries, latest goals, latest
+   InBody) and calls `gpt-4o` to produce today's `ai_daily_goals` +
+   `ai_coach_note` (concise, applies the coaching principles already in the
+   agent prompt).
+3. Upserts **today's** `daily_summaries` row (on `user_id,date`) with those
+   fields.
 
-## Client features (reuse Phase 1–2 patterns exactly)
+Idempotent: safe to run multiple times per day (upsert; regenerates the
+note). Returns `{ ok: true, generated: <n> }` (cron) or the today row (user).
 
-Zustand v5 + immer; every Supabase action captures `{data,error}`, sets
-`error = error?.message ?? null`, toggles `loading`; screens render errors;
-typed client, no read-site `as unknown as`; NativeWind v4; no mock data.
+### Scheduling
+- Enable `pg_cron` + `pg_net` extensions (controller, via MCP).
+- Schedule: `select cron.schedule('daily-coach', '0 6 * * *', $$ ... pg_net POST to the function with x-cron-secret ... $$)`. 6am UTC (documented; user can shift later). The cron SQL is committed in the migration.
+
+### Lazy fallback (client)
+- On app resume / dashboard mount, if today's `daily_summaries` row is
+  missing or `ai_coach_note` is null, the dashboard calls
+  `generate-daily-summary` (user mode) once, then refreshes. Guarded so it
+  fires at most once per app session/day; failure is surfaced but
+  non-blocking (dashboard still renders live rings).
+
+## Agent tools (added to `ai-agent`)
+
+- `generate_meal_plan` — the MODEL supplies the full `plan_json` (days →
+  meals with macros) as the tool args (same way `log_meal` supplies macros —
+  NO nested LLM call inside the executor); the executor persists it as a new
+  `meal_plans` row (append-only, latest per week_start wins) and returns a
+  summary. Args: `{ week_start_date, plan: <plan_json> }`.
+- `generate_workout_plan` — same pattern; model supplies `plan_json`
+  (days → exercises); executor inserts a `workout_plans` row. Args:
+  `{ week_start_date, plan: <plan_json> }`.
+- `get_progress_report` — args `{ start_date?, end_date? }`; returns trend
+  data (weight/body-fat/muscle from `inbody_reports`; calorie adherence from
+  `daily_summaries`/meals) for the range, for the coach to narrate.
+- `get_meal_suggestion` — args `{}`; computes remaining macros for today
+  (goals − consumed) and returns a concrete meal suggestion.
+All derive identity from the JWT-passed `userId`; controller redeploys.
+
+## Client features
+
+Reuse Phase 1/2 patterns (Zustand v5 + immer; error+loading on every
+Supabase action; screens render errors; typed client, write-site casts only;
+NativeWind v4; NO mocks in app code).
 
 1. **`plansStore`** — `mealPlan`, `workoutPlan`, `loading`, `error`,
-   `fetchPlans` (latest of each), `regenerateMealPlan`/`regenerateWorkoutPlan`
-   (send a structured message through the agent client, then re-fetch).
-2. **Coach tab** `app/(tabs)/coach.tsx` — weekly Meal Plan (day → meals with
-   macros), Workout Plan (day → exercises), Regenerate buttons, and an
-   Analytics section; links to the InBody timeline (`app/progress.tsx`).
-3. **`BarChart`** (react-native-svg) — calorie adherence (consumed vs target,
-   last N days). Pure scaling helper unit-tested (empty/single/all-equal/
-   over-100%). Reuse `LineChart` + existing series logic for weight/body-fat/
-   muscle (extract shared series util if needed; keep DRY).
-4. **Dashboard** — show today's `ai_coach_note` (trigger lazy
-   `generate-daily-summary` on open when missing); show a "get a suggestion"
-   prompt card when calories < 80% of target after mid-afternoon (calls the
-   agent's `get_meal_suggestion` via chat).
-5. **`dailySummaryStore`** — extend to trigger/read the lazy coach note.
+   `fetchPlans` (reads the latest `meal_plans` / `workout_plans` row per
+   type), `generateMealPlan`, `generateWorkoutPlan`. The generate actions
+   **reuse the existing `ai-agent`** (no new generation edge function): they
+   POST a directive message (e.g. "Generate a new 7-day meal plan aligned to
+   my goals") to `ai-agent` with the user JWT; the agent calls its
+   `generate_meal_plan` / `generate_workout_plan` tool which persists the
+   row; the store then re-runs `fetchPlans` to load it. Errors surfaced.
+2. **`app/(tabs)/plans.tsx`** (NEW TAB) — weekly meal plan (per-day
+   breakfast/lunch/dinner/snack with macros) + workout plan section below;
+   "Regenerate" buttons; empty state + loading + error.
+3. **`app/(tabs)/_layout.tsx`** — add the Plans tab (5 tabs total) with an
+   icon, placed between Meals and Chat.
+4. **Analytics** — EXTEND `app/progress.tsx`: keep the existing weight/
+   body-fat/muscle `LineChart`s; ADD a `BarChart` (new
+   `components/ui/BarChart.tsx`, react-native-svg) for calorie adherence
+   (last 30 days consumed vs target). A pure `adherenceSeries` helper
+   (unit-tested).
+5. **Dashboard** — show today's `ai_coach_note` (from `daily_summaries`);
+   run the lazy-generate fallback; add a low-fuel prompt card ("Not enough
+   food today — get a suggestion") when calories are well under target later
+   in the day, linking to chat / calling `get_meal_suggestion`.
+
+## Cost note
+Cron adds one gpt-4o call per user per day; plan/suggestion generation are
+on-demand. Acceptable for personal/single-user use; revisit rate-limiting in
+Phase 4.
 
 ## Out of scope (Phase 3)
-
-- Scheduled cron / server-initiated generation (lazy instead).
-- Push notifications, offline, RLS multi-user audit, rate-limiting, Play Store
-  (→ Phase 4).
-- Health Connect (→ Phase 2b).
+- Health Connect (→ Phase 2b). Push notifications, offline, RLS multi-user
+  audit, rate-limiting, Play Store (→ Phase 4). PDF InBody.
 
 ## Quality gates
-
-`tsc --noEmit` clean; `jest` all green (new store + chart-util tests, TDD where
-a testable unit exists); `expo-doctor` 21/21. Edge fns: `verify_jwt`,
-JWT-derived user, no client secrets, RLS on new tables. On-device via a new EAS
-APK when requested.
+`tsc --noEmit` clean; `jest` all green (new store + chart-helper tests, TDD
+where a testable unit exists); `expo-doctor` 21/21. Edge functions
+smoke-tested (401 without auth; cron secret path). Security: RLS on new
+tables, JWT-derived users, cron secret never in client, no client-side AI
+keys. On-device via a new EAS APK when requested.
