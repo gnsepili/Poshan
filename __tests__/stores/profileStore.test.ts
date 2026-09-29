@@ -7,12 +7,24 @@ jest.mock('../../lib/supabase', () => ({
 }))
 
 const mockFrom = (data: unknown, error: unknown = null) => {
-  const chain = { select: jest.fn(), upsert: jest.fn(), insert: jest.fn(), eq: jest.fn(), single: jest.fn() }
+  const chain = {
+    select: jest.fn(),
+    upsert: jest.fn(),
+    insert: jest.fn(),
+    eq: jest.fn(),
+    single: jest.fn(),
+    order: jest.fn(),
+    limit: jest.fn(),
+    maybeSingle: jest.fn(),
+  }
   chain.select.mockReturnValue(chain)
   chain.upsert.mockReturnValue(chain)
   chain.insert.mockReturnValue(chain)
   chain.eq.mockReturnValue(chain)
+  chain.order.mockReturnValue(chain)
+  chain.limit.mockReturnValue(chain)
   chain.single.mockResolvedValue({ data, error })
+  chain.maybeSingle.mockResolvedValue({ data, error })
   ;(supabase.from as jest.Mock).mockReturnValue(chain)
   return chain
 }
@@ -44,6 +56,23 @@ describe('profileStore', () => {
     mockFrom(mockProfile)
     await useProfileStore.getState().upsertProfile({ id: 'user-1', age: 31 })
     expect(useProfileStore.getState().profile).toEqual(mockProfile)
+    expect(useProfileStore.getState().error).toBeNull()
+  })
+
+  it('sets error when fetchGoals fails', async () => {
+    mockFrom(null, { message: 'goals fetch failed' })
+    await useProfileStore.getState().fetchGoals('user-1')
+    expect(useProfileStore.getState().error).toBe('goals fetch failed')
+  })
+
+  it('fetchGoals reads the most recent goals row (latest-wins, not by id)', async () => {
+    const mockGoals = { user_id: 'user-1', daily_calorie_target: 2200 }
+    const chain = mockFrom(mockGoals)
+    await useProfileStore.getState().fetchGoals('user-1')
+    expect(chain.order).toHaveBeenCalledWith('created_at', { ascending: false })
+    expect(chain.limit).toHaveBeenCalledWith(1)
+    expect(chain.maybeSingle).toHaveBeenCalled()
+    expect(useProfileStore.getState().goals).toEqual(mockGoals)
     expect(useProfileStore.getState().error).toBeNull()
   })
 
