@@ -10,6 +10,11 @@ type DailySummaryInsert = Database['public']['Tables']['daily_summaries']['Inser
 interface DailySummaryState {
   summary: DailySummary | null
   loading: boolean
+  // True once fetchOrCreateToday has settled at least once (success or error) for
+  // the current session. Distinguishes "today's row hasn't loaded yet" (summary is
+  // still its initial null) from "loaded, and there really is no row today" — the
+  // dashboard's lazy coach-note fallback must only evaluate after this is true.
+  loaded: boolean
   error: string | null
   fetchOrCreateToday: (userId: string) => Promise<void>
 }
@@ -18,6 +23,7 @@ export const useDailySummaryStore = create<DailySummaryState>()(
   immer((set) => ({
     summary: null,
     loading: false,
+    loaded: false,
     error: null,
 
     fetchOrCreateToday: async (userId) => {
@@ -32,12 +38,12 @@ export const useDailySummaryStore = create<DailySummaryState>()(
         .maybeSingle()
 
       if (fetchError) {
-        set((s) => { s.loading = false; s.error = fetchError.message })
+        set((s) => { s.loading = false; s.loaded = true; s.error = fetchError.message })
         return
       }
 
       if (existing) {
-        set((s) => { s.loading = false; s.summary = existing as DailySummary })
+        set((s) => { s.loading = false; s.loaded = true; s.summary = existing as DailySummary })
         return
       }
 
@@ -61,6 +67,7 @@ export const useDailySummaryStore = create<DailySummaryState>()(
       if (mealsRes.error || goalsRes.error) {
         set((s) => {
           s.loading = false
+          s.loaded = true
           s.error = mealsRes.error?.message ?? goalsRes.error?.message ?? null
         })
         return
@@ -97,6 +104,7 @@ export const useDailySummaryStore = create<DailySummaryState>()(
 
       set((s) => {
         s.loading = false
+        s.loaded = true
         s.summary = insertError ? null : (created as DailySummary)
         s.error = insertError?.message ?? null
       })

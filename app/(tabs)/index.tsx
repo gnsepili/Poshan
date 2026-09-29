@@ -12,7 +12,7 @@ import { MacroBar } from '../../components/ui/MacroBar'
 import { calcProgress, sumMeals } from '../../lib/utils/macros'
 import { sumSteps } from '../../lib/utils/activity'
 import { generateDailySummary } from '../../lib/api/dailySummary'
-import { shouldGenerateCoachNote, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
+import { shouldGenerateAfterLoad, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
 
 // Fires the lazy coach-note generation at most once per app session per calendar day.
 let coachNoteAttemptDate: string | null = null
@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const { user } = useAuthStore()
   const { meals, fetchTodayMeals, error: mealsError } = useMealsStore()
   const { goals, fetchGoals, error: profileError } = useProfileStore()
-  const { summary, fetchOrCreateToday, error: summaryError } = useDailySummaryStore()
+  const { summary, loaded: summaryLoaded, fetchOrCreateToday, error: summaryError } = useDailySummaryStore()
   const { todayActivity, fetchTodayActivity, error: activityError } = useActivityStore()
   const [lazyError, setLazyError] = useState<string | null>(null)
 
@@ -37,13 +37,13 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0]
-    if (user && shouldGenerateCoachNote(summary, coachNoteAttemptDate, today)) {
+    if (user && shouldGenerateAfterLoad(summaryLoaded, summary, coachNoteAttemptDate, today)) {
       coachNoteAttemptDate = today
       generateDailySummary()
         .then(() => fetchOrCreateToday(user.id))
         .catch((e) => setLazyError(e instanceof Error ? e.message : String(e)))
     }
-  }, [user, summary])
+  }, [user, summary, summaryLoaded])
 
   const totals = sumMeals(meals)
   const calorieTarget = goals?.daily_calorie_target ?? 2000

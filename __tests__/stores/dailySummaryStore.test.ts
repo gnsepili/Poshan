@@ -18,7 +18,7 @@ function makeSummaryLookupChain(resolved: Resolved) {
 
 describe('dailySummaryStore', () => {
   beforeEach(() => {
-    useDailySummaryStore.setState({ summary: null, loading: false, error: null })
+    useDailySummaryStore.setState({ summary: null, loading: false, loaded: false, error: null })
     jest.clearAllMocks()
   })
 
@@ -30,6 +30,7 @@ describe('dailySummaryStore', () => {
 
     expect(useDailySummaryStore.getState().error).toBe('lookup failed')
     expect(useDailySummaryStore.getState().summary).toBeNull()
+    expect(useDailySummaryStore.getState().loaded).toBe(true)
   })
 
   it('uses the existing row for today without creating a new one', async () => {
@@ -47,6 +48,7 @@ describe('dailySummaryStore', () => {
     expect(useDailySummaryStore.getState().summary).toEqual(existing)
     expect(insertSpy).not.toHaveBeenCalled()
     expect(useDailySummaryStore.getState().error).toBeNull()
+    expect(useDailySummaryStore.getState().loaded).toBe(true)
   })
 
   it('creates a new summary from today’s meals and the latest goals row when none exists', async () => {
@@ -111,5 +113,6 @@ describe('dailySummaryStore', () => {
     )
     expect(useDailySummaryStore.getState().summary).toEqual(created)
     expect(useDailySummaryStore.getState().error).toBeNull()
+    expect(useDailySummaryStore.getState().loaded).toBe(true)
   })
 })

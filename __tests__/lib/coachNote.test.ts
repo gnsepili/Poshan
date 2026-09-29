@@ -1,4 +1,4 @@
-import { shouldGenerateCoachNote, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
+import { shouldGenerateCoachNote, shouldGenerateAfterLoad, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
 import { DailySummary } from '../../types'
 
 const summary = (note: string | null): DailySummary => ({
@@ -19,6 +19,24 @@ describe('shouldGenerateCoachNote', () => {
   })
   it('does NOT fire when a note already exists', () => {
     expect(shouldGenerateCoachNote(summary('good morning'), null, '2026-09-29')).toBe(false)
+  })
+})
+
+describe('shouldGenerateAfterLoad', () => {
+  it('does NOT fire while today\'s row has not finished loading, even if summary is still null', () => {
+    expect(shouldGenerateAfterLoad(false, null, null, '2026-09-29')).toBe(false)
+  })
+  it('does NOT fire once loaded when the loaded row already has a coach note', () => {
+    expect(shouldGenerateAfterLoad(true, summary('good morning'), null, '2026-09-29')).toBe(false)
+  })
+  it('fires once loaded when there is no row at all', () => {
+    expect(shouldGenerateAfterLoad(true, null, null, '2026-09-29')).toBe(true)
+  })
+  it('fires once loaded when the row exists but has no coach note yet', () => {
+    expect(shouldGenerateAfterLoad(true, summary(null), null, '2026-09-29')).toBe(true)
+  })
+  it('does NOT fire again once already attempted today', () => {
+    expect(shouldGenerateAfterLoad(true, summary(null), '2026-09-29', '2026-09-29')).toBe(false)
   })
 })
 

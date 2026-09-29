@@ -12,6 +12,21 @@ export function shouldGenerateCoachNote(
   return summary.ai_coach_note === null || summary.ai_coach_note === ''
 }
 
+// Gates the lazy-generate decision on today's row having actually finished loading.
+// A cold mount reads `summary === null` from the store's initial state before the
+// fetch resolves, which would otherwise be indistinguishable from "no row exists
+// today" and misfire the lazy generate on every app open. Only evaluate the real
+// generate condition once `loaded` is true (the fetch has settled, success or error).
+export function shouldGenerateAfterLoad(
+  loaded: boolean,
+  summary: DailySummary | null,
+  lastAttemptDate: string | null,
+  today: string
+): boolean {
+  if (!loaded) return false
+  return shouldGenerateCoachNote(summary, lastAttemptDate, today)
+}
+
 // Low-fuel prompt: only in the afternoon (>= 15:00 local) and when under 80% of
 // the calorie target. Guards a zero target so we never divide by zero.
 export function shouldShowLowFuelPrompt(consumed: number, target: number, now: Date): boolean {
