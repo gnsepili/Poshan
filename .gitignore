@@ -3,3 +3,19 @@
 node_modules/
 .expo/
 .mcp.json
+.claude/
+
+# Expo / native build artifacts
+dist/
+web-build/
+/android
+/ios
+*.orig.*
+.superpowers/
+
+# macOS
+.DS_Store
+
+# Metro
+.metro-health-check*
+expo-env.d.ts
