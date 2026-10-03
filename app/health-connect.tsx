@@ -1,61 +1,112 @@
 import { useEffect } from 'react'
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, Platform } from 'react-native'
 import { useAuthStore } from '../stores/authStore'
 import { useHealthConnectStore } from '../stores/healthConnectStore'
+import { Screen, Card, Button, Badge, EmptyState, Heading, Text } from '../components/ui'
+import { useThemeColors } from '../lib/theme'
+import { HeartPulse, Footprints, Flame, Watch } from 'lucide-react-native'
+import type { LucideIcon } from 'lucide-react-native'
 
 export default function HealthConnectScreen() {
-  const router = useRouter()
   const { user } = useAuthStore()
-  const { available, permissionGranted, todaySteps, todayActiveCalories, todayHeartRate, syncing, error, lastSyncedAt, checkAvailability, requestPermissions, syncNow } =
-    useHealthConnectStore()
+  const colors = useThemeColors()
+  const {
+    available,
+    permissionGranted,
+    todaySteps,
+    todayActiveCalories,
+    todayHeartRate,
+    syncing,
+    error,
+    lastSyncedAt,
+    checkAvailability,
+    requestPermissions,
+    syncNow,
+  } = useHealthConnectStore()
 
   useEffect(() => { checkAvailability() }, [])
 
+  const unavailable = Platform.OS !== 'android' || available === false
+
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-4 border-b border-gray-100 flex-row items-center">
-        <Pressable onPress={() => router.back()} className="mr-3"><Text className="text-green-600 text-lg">‹ Back</Text></Pressable>
-        <Text className="text-2xl font-bold text-gray-900">Health Connect</Text>
-      </View>
+    <Screen back title="Health Connect" scroll>
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">{error}</Text>
+        </View>
+      ) : null}
 
-      {error && <Text className="text-red-500 mx-6 mt-4">{error}</Text>}
-
-      <View className="px-6 pt-4">
-        {Platform.OS !== 'android' || available === false ? (
-          <View className="bg-white rounded-xl p-4 border border-gray-100">
-            <Text className="text-gray-800 font-semibold mb-1">Not available on this device</Text>
-            <Text className="text-gray-500 text-sm">
-              Health Connect is an Android feature. Install the Health Connect app (Android) to auto-sync steps, active
-              calories, heart rate and workouts. You can keep logging activity manually in the meantime.
+      {unavailable ? (
+        <EmptyState
+          icon={Watch}
+          title="Not available on this device"
+          description="Health Connect is an Android feature. Install the Health Connect app to auto-sync steps, active calories, heart rate and workouts. You can keep logging activity manually in the meantime."
+        />
+      ) : (
+        <>
+          <View className="flex-row items-start justify-between gap-3 mb-5">
+            <Text variant="bodySm" muted className="flex-1">
+              Sync steps, active calories, heart rate and workouts that Google Fit and other apps
+              write into Health Connect.
             </Text>
+            <Badge
+              label={permissionGranted ? 'Connected' : 'Not connected'}
+              tone={permissionGranted ? 'primary' : 'neutral'}
+            />
           </View>
-        ) : (
-          <>
-            <Text className="text-gray-600 mb-4">
-              Sync steps, active calories, heart rate and workouts that Google Fit and other apps write into Health Connect.
-            </Text>
-            {!permissionGranted ? (
-              <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-4" onPress={requestPermissions}>
-                <Text className="text-white font-semibold text-base">Connect Health Connect</Text>
-              </Pressable>
-            ) : (
-              <>
-                <View className="bg-white rounded-xl p-4 border border-gray-100 mb-4">
-                  <Text className="text-gray-800 font-semibold mb-2">Today (from Health Connect)</Text>
-                  <Text className="text-sm text-gray-600">Steps: {todaySteps}</Text>
-                  <Text className="text-sm text-gray-600">Active calories: {todayActiveCalories} kcal</Text>
-                  <Text className="text-sm text-gray-600">Heart rate: {todayHeartRate != null ? `${todayHeartRate} bpm` : '—'}</Text>
-                  {lastSyncedAt ? <Text className="text-xs text-gray-400 mt-2">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</Text> : null}
-                </View>
-                <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-4" disabled={syncing} onPress={() => user && syncNow(user.id)}>
-                  {syncing ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Sync now</Text>}
-                </Pressable>
-              </>
-            )}
-          </>
-        )}
-      </View>
-    </ScrollView>
+
+          {!permissionGranted ? (
+            <Button label="Connect Health Connect" onPress={requestPermissions} />
+          ) : (
+            <>
+              <Heading level={4} uppercase className="mb-3">Today</Heading>
+              <View className="flex-row gap-3 mb-2">
+                <StatCard icon={Footprints} label="Steps" value={`${todaySteps}`} color={colors.primary} />
+                <StatCard icon={Flame} label="Active cal" value={`${todayActiveCalories}`} color={colors.accent} />
+                <StatCard
+                  icon={HeartPulse}
+                  label="Heart rate"
+                  value={todayHeartRate != null ? `${todayHeartRate}` : '—'}
+                  color={colors.info}
+                />
+              </View>
+              {lastSyncedAt ? (
+                <Text variant="caption" muted className="mb-4">
+                  Last synced {new Date(lastSyncedAt).toLocaleTimeString()}
+                </Text>
+              ) : (
+                <View className="mb-4" />
+              )}
+              <Button
+                label="Sync now"
+                variant="accent"
+                loading={syncing}
+                onPress={() => user && syncNow(user.id)}
+              />
+            </>
+          )}
+        </>
+      )}
+    </Screen>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  color: string
+}) {
+  return (
+    <Card className="flex-1 items-center py-4">
+      <Icon size={20} color={color} />
+      <Text className="font-display text-2xl text-foreground mt-1">{value}</Text>
+      <Text variant="caption" muted>{label}</Text>
+    </Card>
   )
 }

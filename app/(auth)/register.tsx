@@ -1,42 +1,82 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
+import { View, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
+import { Mail, Lock, Eye, EyeOff, Leaf } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
+import { Button, Input, Heading, Text } from '../../components/ui'
+import { useThemeColors } from '../../lib/theme'
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [show, setShow] = useState(false)
   const { signUp, loading, error } = useAuthStore()
+  const insets = useSafeAreaInsets()
+  const colors = useThemeColors()
 
   return (
-    <View className="flex-1 justify-center px-6 bg-white">
-      <Text className="text-3xl font-bold mb-8 text-gray-900">Create account</Text>
-      {error && <Text className="text-red-500 mb-4">{error}</Text>}
-      <TextInput
-        className="border border-gray-300 rounded-lg px-4 py-3 mb-4 text-base"
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <TextInput
-        className="border border-gray-300 rounded-lg px-4 py-3 mb-6 text-base"
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <Pressable
-        className="bg-green-600 rounded-lg py-4 items-center"
-        onPress={() => signUp(email, password)}
-        disabled={loading}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-background"
+    >
+      <View
+        className="flex-1 justify-center px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
-        {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Create account</Text>}
-      </Pressable>
-      <Link href="/(auth)/login" className="text-center mt-4 text-green-600">
-        Already have an account? Sign in
-      </Link>
-    </View>
+        <View className="items-center mb-10">
+          <View className="h-16 w-16 rounded-3xl bg-primary items-center justify-center mb-4">
+            <Leaf size={30} color={colors.onPrimary} />
+          </View>
+          <Heading level={1} uppercase>Get started</Heading>
+          <Text variant="body" muted>Create your Poshan AI account</Text>
+        </View>
+
+        {error ? (
+          <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+            <Text variant="bodySm" className="text-danger">{error}</Text>
+          </View>
+        ) : null}
+
+        <View className="gap-4">
+          <Input
+            label="Email"
+            icon={Mail}
+            placeholder="you@email.com"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+          />
+          <Input
+            label="Password"
+            icon={Lock}
+            placeholder="At least 6 characters"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!show}
+            autoComplete="password-new"
+            textContentType="newPassword"
+            rightIcon={show ? EyeOff : Eye}
+            onRightIconPress={() => setShow((s) => !s)}
+            rightIconLabel={show ? 'Hide password' : 'Show password'}
+            helper="Use 6 or more characters."
+          />
+        </View>
+
+        <View className="mt-6">
+          <Button label="Create account" loading={loading} onPress={() => signUp(email, password)} />
+        </View>
+
+        <View className="flex-row justify-center mt-6">
+          <Text variant="bodySm" muted>Already have an account? </Text>
+          <Link href="/(auth)/login">
+            <Text variant="bodySm" className="text-primary font-semibold">Sign in</Text>
+          </Link>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   )
 }

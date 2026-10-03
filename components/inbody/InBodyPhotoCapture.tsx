@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { View, Pressable, Image, ActivityIndicator, Text } from 'react-native'
+import { View, Image, ActivityIndicator } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
+import { Camera, Images } from 'lucide-react-native'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { PressableCard, Button, Text } from '../ui'
+import { useThemeColors } from '../../lib/theme'
 
 interface Props {
   onUploaded: (path: string) => void
@@ -12,6 +15,7 @@ interface Props {
 
 export function InBodyPhotoCapture({ onUploaded }: Props) {
   const { user } = useAuthStore()
+  const colors = useThemeColors()
   const [uri, setUri] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -42,18 +46,51 @@ export function InBodyPhotoCapture({ onUploaded }: Props) {
     if (!result.canceled) await upload(result.assets[0])
   }
 
-  if (uploading) return <ActivityIndicator className="my-4" />
-
   return (
-    <View>
-      <View className="border-2 border-dashed border-gray-300 rounded-xl h-40 items-center justify-center mb-3 overflow-hidden">
-        {uri ? <Image source={{ uri }} className="w-full h-full" resizeMode="contain" /> : <Text className="text-gray-400">No scan selected</Text>}
+    <View className="mb-4">
+      <PressableCard
+        onPress={takePhoto}
+        disabled={uploading}
+        padded={false}
+        className="h-44 items-center justify-center overflow-hidden mb-3"
+        accessibilityLabel={uri ? 'Retake InBody photo' : 'Take InBody photo'}
+      >
+        {uploading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : uri ? (
+          <Image source={{ uri }} className="w-full h-full" resizeMode="contain" />
+        ) : (
+          <View className="items-center px-6">
+            <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-soft mb-3">
+              <Camera size={22} color={colors.primary} />
+            </View>
+            <Text variant="bodySm" muted className="text-center">
+              Tap to snap a photo of your InBody printout
+            </Text>
+          </View>
+        )}
+      </PressableCard>
+
+      <View className="flex-row gap-3">
+        <Button
+          label="Take photo"
+          icon={Camera}
+          onPress={takePhoto}
+          disabled={uploading}
+          className="flex-1"
+        />
+        <Button
+          label="Choose from gallery"
+          icon={Images}
+          variant="secondary"
+          onPress={pickPhoto}
+          disabled={uploading}
+          className="flex-1"
+        />
       </View>
-      <View className="flex-row gap-2 mb-2">
-        <Pressable onPress={takePhoto} className="flex-1 bg-green-600 rounded-lg py-3 items-center"><Text className="text-white font-semibold">Take photo</Text></Pressable>
-        <Pressable onPress={pickPhoto} className="flex-1 bg-white border border-gray-300 rounded-lg py-3 items-center"><Text className="text-gray-700 font-semibold">Choose from gallery</Text></Pressable>
-      </View>
-      {uploadError && <Text className="text-red-500 text-xs mb-2">{uploadError}</Text>}
+      {uploadError ? (
+        <Text variant="caption" className="text-danger mt-2">{uploadError}</Text>
+      ) : null}
     </View>
   )
 }

@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Check } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { AiProvider } from '../../types'
+import { Screen, Heading, Text, PressableCard, Button } from '../../components/ui'
+import { useThemeColors } from '../../lib/theme'
 
 const PROVIDERS: { id: AiProvider; label: string; description: string }[] = [
   { id: 'claude', label: 'Claude (Anthropic)', description: 'Best reasoning and nuanced health advice' },
@@ -13,6 +16,7 @@ const PROVIDERS: { id: AiProvider; label: string; description: string }[] = [
 
 export default function AiSetupScreen() {
   const router = useRouter()
+  const colors = useThemeColors()
   const { user } = useAuthStore()
   const { upsertProfile, loading, error } = useProfileStore()
   const [selected, setSelected] = useState<AiProvider>('claude')
@@ -26,19 +30,55 @@ export default function AiSetupScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white px-6 pt-12">
-      <Text className="text-2xl font-bold mb-2 text-gray-900">Choose your AI</Text>
-      <Text className="text-gray-500 mb-6">This powers your health coach. You can change it later in settings.</Text>
-      {error && <Text className="text-red-500 mb-4">{error}</Text>}
-      {PROVIDERS.map(p => (
-        <Pressable key={p.id} onPress={() => setSelected(p.id)} className={`p-4 rounded-xl border mb-3 ${selected === p.id ? 'border-green-600 bg-green-50' : 'border-gray-200'}`}>
-          <Text className="font-semibold text-gray-900">{p.label}</Text>
-          <Text className="text-gray-500 text-sm mt-1">{p.description}</Text>
-        </Pressable>
-      ))}
-      <Pressable className="bg-green-600 rounded-lg py-4 items-center mt-6" onPress={handleFinish} disabled={loading}>
-        <Text className="text-white font-semibold text-base">Start coaching</Text>
-      </Pressable>
-    </View>
+    <Screen scroll footer={<Button label="Start coaching" loading={loading} onPress={handleFinish} />}>
+      <View className="mt-1 mb-6">
+        <Text variant="caption" muted className="uppercase tracking-wide">
+          Step 3 of 3
+        </Text>
+        <Heading level={1} uppercase>
+          Choose your AI
+        </Heading>
+        <Text variant="body" muted className="mt-1">
+          This powers your health coach. You can change it later in settings.
+        </Text>
+      </View>
+
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">
+            {error}
+          </Text>
+        </View>
+      ) : null}
+
+      <View className="gap-3">
+        {PROVIDERS.map((p) => {
+          const isSelected = selected === p.id
+          return (
+            <PressableCard
+              key={p.id}
+              onPress={() => setSelected(p.id)}
+              className={isSelected ? 'bg-primary-soft border-primary' : ''}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 pr-3">
+                  <Text variant="label">{p.label}</Text>
+                  <Text variant="bodySm" muted className="mt-1">
+                    {p.description}
+                  </Text>
+                </View>
+                {isSelected ? (
+                  <View className="h-7 w-7 items-center justify-center rounded-full bg-primary">
+                    <Check size={16} color={colors.onPrimary} />
+                  </View>
+                ) : null}
+              </View>
+            </PressableCard>
+          )
+        })}
+      </View>
+    </Screen>
   )
 }

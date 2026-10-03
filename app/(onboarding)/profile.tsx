@@ -1,11 +1,27 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Calendar, Ruler, Weight as WeightIcon } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { ActivityLevel } from '../../types'
+import { Screen, Heading, Text, Input, Chip, Button } from '../../components/ui'
 
 const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active']
+
+const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
+  sedentary: 'Sedentary',
+  light: 'Light',
+  moderate: 'Moderate',
+  active: 'Active',
+  very_active: 'Very active',
+}
+
+const SEX_LABELS: Record<'male' | 'female' | 'other', string> = {
+  male: 'Male',
+  female: 'Female',
+  other: 'Other',
+}
 
 export default function OnboardingProfileScreen() {
   const router = useRouter()
@@ -33,34 +49,87 @@ export default function OnboardingProfileScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-white px-6 pt-12">
-      <Text className="text-2xl font-bold mb-6 text-gray-900">Your health profile</Text>
-      {error && <Text className="text-red-500 mb-4">{error}</Text>}
-      <Text className="text-gray-600 mb-1">Age</Text>
-      <TextInput className="border border-gray-300 rounded-lg px-4 py-3 mb-4" keyboardType="number-pad" value={age} onChangeText={setAge} placeholder="e.g. 28" />
-      <Text className="text-gray-600 mb-1">Sex</Text>
-      <View className="flex-row gap-2 mb-4">
-        {(['male', 'female', 'other'] as const).map(s => (
-          <Pressable key={s} onPress={() => setSex(s)} className={`flex-1 py-3 rounded-lg border items-center ${sex === s ? 'bg-green-600 border-green-600' : 'border-gray-300'}`}>
-            <Text className={sex === s ? 'text-white' : 'text-gray-700'}>{s}</Text>
-          </Pressable>
-        ))}
+    <Screen scroll footer={<Button label="Next: Set goals" loading={loading} onPress={handleNext} />}>
+      <View className="mt-1 mb-6">
+        <Text variant="caption" muted className="uppercase tracking-wide">
+          Step 1 of 3
+        </Text>
+        <Heading level={1} uppercase>
+          Your health profile
+        </Heading>
+        <Text variant="body" muted className="mt-1">
+          Tell us a bit about yourself so we can personalize your plan.
+        </Text>
       </View>
-      <Text className="text-gray-600 mb-1">Height (cm)</Text>
-      <TextInput className="border border-gray-300 rounded-lg px-4 py-3 mb-4" keyboardType="decimal-pad" value={heightCm} onChangeText={setHeightCm} placeholder="e.g. 175" />
-      <Text className="text-gray-600 mb-1">Current weight (kg)</Text>
-      <TextInput className="border border-gray-300 rounded-lg px-4 py-3 mb-4" keyboardType="decimal-pad" value={weightKg} onChangeText={setWeightKg} placeholder="e.g. 75" />
-      <Text className="text-gray-600 mb-1">Activity level</Text>
-      <View className="gap-2 mb-8">
-        {ACTIVITY_LEVELS.map(level => (
-          <Pressable key={level} onPress={() => setActivityLevel(level)} className={`py-3 px-4 rounded-lg border ${activityLevel === level ? 'bg-green-600 border-green-600' : 'border-gray-300'}`}>
-            <Text className={activityLevel === level ? 'text-white' : 'text-gray-700'}>{level}</Text>
-          </Pressable>
-        ))}
+
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">
+            {error}
+          </Text>
+        </View>
+      ) : null}
+
+      <View className="gap-4">
+        <Input
+          label="Age"
+          icon={Calendar}
+          keyboardType="number-pad"
+          value={age}
+          onChangeText={setAge}
+          placeholder="e.g. 28"
+        />
+
+        <View>
+          <Text variant="label" className="mb-1.5">
+            Sex
+          </Text>
+          <View className="flex-row gap-2">
+            {(['male', 'female', 'other'] as const).map((s) => (
+              <Chip
+                key={s}
+                label={SEX_LABELS[s]}
+                selected={sex === s}
+                onPress={() => setSex(s)}
+                className="flex-1 justify-center"
+              />
+            ))}
+          </View>
+        </View>
+
+        <Input
+          label="Height (cm)"
+          icon={Ruler}
+          keyboardType="decimal-pad"
+          value={heightCm}
+          onChangeText={setHeightCm}
+          placeholder="e.g. 175"
+        />
+        <Input
+          label="Current weight (kg)"
+          icon={WeightIcon}
+          keyboardType="decimal-pad"
+          value={weightKg}
+          onChangeText={setWeightKg}
+          placeholder="e.g. 75"
+        />
+
+        <View>
+          <Text variant="label" className="mb-1.5">
+            Activity level
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {ACTIVITY_LEVELS.map((level) => (
+              <Chip
+                key={level}
+                label={ACTIVITY_LABELS[level]}
+                selected={activityLevel === level}
+                onPress={() => setActivityLevel(level)}
+              />
+            ))}
+          </View>
+        </View>
       </View>
-      <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-8" onPress={handleNext} disabled={loading}>
-        <Text className="text-white font-semibold text-base">Next: Set goals</Text>
-      </Pressable>
-    </ScrollView>
+    </Screen>
   )
 }

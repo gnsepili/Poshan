@@ -1,8 +1,11 @@
-import { View, Text, Pressable, ScrollView } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Check, ChevronRight, HeartPulse, LogOut } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { AiProvider } from '../../types'
+import { Screen, Heading, Text, Card, PressableCard, Button } from '../../components/ui'
+import { useThemeColors } from '../../lib/theme'
 
 const PROVIDERS: { id: AiProvider; label: string }[] = [
   { id: 'claude', label: 'Claude (Anthropic)' },
@@ -12,6 +15,7 @@ const PROVIDERS: { id: AiProvider; label: string }[] = [
 
 export default function SettingsScreen() {
   const router = useRouter()
+  const colors = useThemeColors()
   const { user, signOut, loading: authLoading, error: authError } = useAuthStore()
   const { profile, upsertProfile, loading: profileLoading, error: profileError } = useProfileStore()
 
@@ -23,59 +27,86 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-4 border-b border-gray-100">
-        <Text className="text-2xl font-bold text-gray-900">Settings</Text>
+    <Screen scroll>
+      <View className="mt-1 mb-6">
+        <Heading level={1} uppercase>
+          Settings
+        </Heading>
       </View>
 
-      {errorMessage && (
-        <View className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <Text className="text-red-600 text-sm">{errorMessage}</Text>
+      {errorMessage ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">
+            {errorMessage}
+          </Text>
         </View>
-      )}
+      ) : null}
 
-      <View className="px-4 pt-4">
-        <Text className="text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">AI Provider</Text>
-        <View className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-4">
-          {PROVIDERS.map((p, i) => (
+      <Heading level={4} uppercase className="mb-3">
+        AI provider
+      </Heading>
+      <Card padded={false} className="mb-6 overflow-hidden">
+        {PROVIDERS.map((p, i) => {
+          const isSelected = profile?.ai_provider === p.id
+          return (
             <Pressable
               key={p.id}
               onPress={() => changeProvider(p.id)}
               disabled={profileLoading}
-              className={`px-4 py-4 flex-row justify-between items-center ${i < PROVIDERS.length - 1 ? 'border-b border-gray-100' : ''}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected, disabled: profileLoading }}
+              className={`min-h-[44px] px-4 py-4 flex-row justify-between items-center active:bg-surface-muted ${
+                i < PROVIDERS.length - 1 ? 'border-b border-border' : ''
+              }`}
             >
-              <Text className="text-gray-900">{p.label}</Text>
-              {profile?.ai_provider === p.id && <Text className="text-green-600 font-semibold">✓</Text>}
+              <Text variant="body">{p.label}</Text>
+              {isSelected ? <Check size={20} color={colors.primary} /> : null}
             </Pressable>
-          ))}
-        </View>
+          )
+        })}
+      </Card>
 
-        <Text className="text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">Account</Text>
-        <View className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-4">
-          <Pressable className="px-4 py-4 border-b border-gray-100" onPress={() => router.push('/(onboarding)/profile')}>
-            <Text className="text-gray-900">Edit health profile</Text>
-          </Pressable>
-          <Pressable className="px-4 py-4" onPress={() => router.push('/(onboarding)/goals')}>
-            <Text className="text-gray-900">Edit goals</Text>
-          </Pressable>
-        </View>
-
-        <Text className="text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">Integrations</Text>
-        <View className="mb-4">
-          <Pressable className="bg-white rounded-xl border border-gray-100 px-4 py-4" onPress={() => router.push('/health-connect')}>
-            <Text className="text-gray-800 font-semibold">Health Connect</Text>
-            <Text className="text-gray-500 text-xs mt-1">Auto-sync steps, calories, heart rate and workouts (Android)</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          className="bg-red-50 rounded-xl border border-red-100 px-4 py-4 items-center mb-8"
-          onPress={signOut}
-          disabled={authLoading}
+      <Heading level={4} uppercase className="mb-3">
+        Account
+      </Heading>
+      <View className="gap-3 mb-6">
+        <PressableCard
+          className="flex-row items-center justify-between"
+          onPress={() => router.push('/(onboarding)/profile')}
         >
-          <Text className="text-red-600 font-semibold">Sign out</Text>
-        </Pressable>
+          <Text variant="body">Edit health profile</Text>
+          <ChevronRight size={20} color={colors.mutedForeground} />
+        </PressableCard>
+        <PressableCard
+          className="flex-row items-center justify-between"
+          onPress={() => router.push('/(onboarding)/goals')}
+        >
+          <Text variant="body">Edit goals</Text>
+          <ChevronRight size={20} color={colors.mutedForeground} />
+        </PressableCard>
       </View>
-    </ScrollView>
+
+      <Heading level={4} uppercase className="mb-3">
+        Integrations
+      </Heading>
+      <PressableCard className="mb-8" onPress={() => router.push('/health-connect')}>
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-3 flex-1 pr-3">
+            <HeartPulse size={20} color={colors.primary} />
+            <View className="flex-1">
+              <Text variant="label">Health Connect</Text>
+              <Text variant="caption" muted className="mt-0.5">
+                Auto-sync steps, calories, heart rate and workouts (Android)
+              </Text>
+            </View>
+          </View>
+          <ChevronRight size={20} color={colors.mutedForeground} />
+        </View>
+      </PressableCard>
+
+      <View className="border-t border-border pt-6 mb-4">
+        <Button label="Sign out" variant="danger" icon={LogOut} loading={authLoading} onPress={signOut} />
+      </View>
+    </Screen>
   )
 }

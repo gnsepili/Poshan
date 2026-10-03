@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, ActivityIndicator } from 'react-native'
 import { useAuthStore } from '../stores/authStore'
 import { useInbodyStore } from '../stores/inbodyStore'
 import { InBodyPhotoCapture } from '../components/inbody/InBodyPhotoCapture'
 import { analyzeInBodyPhoto, InBodyAnalysisResult } from '../lib/api/inbody'
+import { Screen, Card, Input, Button, Heading, Text, EmptyState } from '../components/ui'
+import { useThemeColors } from '../lib/theme'
+import { Scale, Sparkles } from 'lucide-react-native'
 
 const numOrEmpty = (v: number | null) => (v === null ? '' : String(v))
 const parseOrNull = (v: string) => (v.trim() === '' ? null : Number(v))
 
 export default function InBodyScreen() {
-  const router = useRouter()
   const { user } = useAuthStore()
   const { reports, fetchReports, addReport, loading, error } = useInbodyStore()
+  const colors = useThemeColors()
 
   const [path, setPath] = useState<string | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
@@ -74,48 +76,79 @@ export default function InBodyScreen() {
   ]
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-4 border-b border-gray-100 flex-row items-center">
-        <Pressable onPress={() => router.back()} className="mr-3"><Text className="text-green-600 text-lg">‹ Back</Text></Pressable>
-        <Text className="text-2xl font-bold text-gray-900">InBody scan</Text>
-      </View>
+    <Screen back title="InBody scan" scroll>
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">{error}</Text>
+        </View>
+      ) : null}
 
-      <View className="px-6 pt-4">
-        <InBodyPhotoCapture onUploaded={onUploaded} />
-        {analyzing && <ActivityIndicator className="my-4" color="#16a34a" />}
-        {analyzeError && <Text className="text-red-500 mb-2">{analyzeError}</Text>}
-        {error && <Text className="text-red-500 mb-2">{error}</Text>}
+      <InBodyPhotoCapture onUploaded={onUploaded} />
 
-        {analysis && (
-          <View className="mt-2">
-            <Text className="text-gray-500 text-sm mb-3">Review the extracted values. Blank fields could not be read from the photo — leave them blank rather than guessing.</Text>
+      {analyzing ? (
+        <View className="flex-row items-center gap-2 my-4">
+          <ActivityIndicator color={colors.primary} />
+          <Text variant="bodySm" muted>Reading your scan…</Text>
+        </View>
+      ) : null}
+
+      {analyzeError ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">{analyzeError}</Text>
+        </View>
+      ) : null}
+
+      {analysis ? (
+        <Card className="mb-6">
+          <Text variant="bodySm" muted className="mb-4">
+            Review the extracted values. Blank fields could not be read from the photo — leave
+            them blank rather than guessing.
+          </Text>
+          <View className="gap-4 mb-4">
             {metricFields.map(({ label, value, setter }) => (
-              <View key={label} className="mb-4">
-                <Text className="text-gray-600 mb-1">{label}</Text>
-                <TextInput className="border border-gray-300 rounded-lg px-4 py-3" keyboardType="decimal-pad" value={value} onChangeText={setter} placeholder="Not read" />
-              </View>
+              <Input
+                key={label}
+                label={label}
+                keyboardType="decimal-pad"
+                value={value}
+                onChangeText={setter}
+                placeholder="Not read"
+              />
             ))}
-            <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-6" onPress={handleSave} disabled={loading}>
-              {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Save scan</Text>}
-            </Pressable>
           </View>
-        )}
+          <Button label="Save scan" onPress={handleSave} loading={loading} />
+        </Card>
+      ) : null}
 
-        <Text className="font-semibold text-gray-700 mb-3">Past scans</Text>
-        {reports.length === 0
-          ? <Text className="text-gray-400 text-center py-8">No scans yet</Text>
-          : reports.map((r) => (
-            <View key={r.id} className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
-              <Text className="text-xs text-gray-400 mb-1">{new Date(r.scanned_at).toLocaleDateString()}</Text>
-              <View className="flex-row flex-wrap gap-x-4">
-                <Text className="text-sm text-gray-700">Wt: {r.weight_kg ?? '—'} kg</Text>
-                <Text className="text-sm text-gray-700">BF: {r.body_fat_pct ?? '—'}%</Text>
-                <Text className="text-sm text-gray-700">Muscle: {r.muscle_mass_kg ?? '—'} kg</Text>
+      <Heading level={4} uppercase className="mb-3">Past scans</Heading>
+      {reports.length === 0 ? (
+        <EmptyState
+          icon={Scale}
+          title="No scans yet"
+          description="Capture an InBody printout to start tracking your body composition over time."
+        />
+      ) : (
+        <View className="gap-3">
+          {reports.map((r) => (
+            <Card key={r.id}>
+              <Text variant="caption" muted className="mb-2">
+                {new Date(r.scanned_at).toLocaleDateString()}
+              </Text>
+              <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+                <Text variant="bodySm">Wt: {r.weight_kg ?? '—'} kg</Text>
+                <Text variant="bodySm">BF: {r.body_fat_pct ?? '—'}%</Text>
+                <Text variant="bodySm">Muscle: {r.muscle_mass_kg ?? '—'} kg</Text>
               </View>
-              {r.ai_notes ? <Text className="text-xs text-amber-700 mt-2 bg-amber-50 rounded p-2">{r.ai_notes}</Text> : null}
-            </View>
+              {r.ai_notes ? (
+                <View className="flex-row items-start gap-2 mt-3 bg-accent-soft rounded-xl p-3">
+                  <Sparkles size={15} color={colors.accent} />
+                  <Text variant="caption" className="flex-1 text-foreground">{r.ai_notes}</Text>
+                </View>
+              ) : null}
+            </Card>
           ))}
-      </View>
-    </ScrollView>
+        </View>
+      )}
+    </Screen>
   )
 }

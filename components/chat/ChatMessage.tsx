@@ -1,4 +1,5 @@
-import { View, Text } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../ui'
 import { ChatRole } from '../../types'
 
 interface Props {
@@ -12,10 +13,12 @@ export function ChatMessage({ role, content }: Props) {
     <View className={`mb-3 max-w-[80%] ${isUser ? 'self-end' : 'self-start'}`}>
       <View
         className={`px-4 py-3 rounded-2xl ${
-          isUser ? 'bg-green-600 rounded-br-sm' : 'bg-white rounded-bl-sm shadow-sm border border-gray-100'
+          isUser ? 'bg-primary rounded-br-sm' : 'bg-surface border border-border rounded-bl-sm'
         }`}
       >
-        <Text className={isUser ? 'text-white' : 'text-gray-900'}>{content}</Text>
+        <Text variant="body" className={isUser ? 'text-on-primary' : 'text-foreground'}>
+          {content}
+        </Text>
       </View>
     </View>
   )

@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Scale, Flame, Footprints } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
+import { Screen, Heading, Text, Input, Card, Button } from '../../components/ui'
 
 export default function OnboardingGoalsScreen() {
   const router = useRouter()
@@ -32,25 +34,63 @@ export default function OnboardingGoalsScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-white px-6 pt-12">
-      <Text className="text-2xl font-bold mb-6 text-gray-900">Your goals</Text>
-      {error && <Text className="text-red-500 mb-4">{error}</Text>}
-      {[
-        { label: 'Target weight (kg)', value: targetWeight, setter: setTargetWeight },
-        { label: 'Daily calories (kcal)', value: calories, setter: setCalories },
-        { label: 'Protein (g)', value: protein, setter: setProtein },
-        { label: 'Carbs (g)', value: carbs, setter: setCarbs },
-        { label: 'Fat (g)', value: fat, setter: setFat },
-        { label: 'Daily steps', value: steps, setter: setSteps },
-      ].map(({ label, value, setter }) => (
-        <View key={label} className="mb-4">
-          <Text className="text-gray-600 mb-1">{label}</Text>
-          <TextInput className="border border-gray-300 rounded-lg px-4 py-3" keyboardType="decimal-pad" value={value} onChangeText={setter} />
+    <Screen scroll footer={<Button label="Next: AI setup" loading={loading} onPress={handleNext} />}>
+      <View className="mt-1 mb-6">
+        <Text variant="caption" muted className="uppercase tracking-wide">
+          Step 2 of 3
+        </Text>
+        <Heading level={1} uppercase>
+          Your goals
+        </Heading>
+        <Text variant="body" muted className="mt-1">
+          Set the targets we&apos;ll track against every day.
+        </Text>
+      </View>
+
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">
+            {error}
+          </Text>
         </View>
-      ))}
-      <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-8 mt-4" onPress={handleNext} disabled={loading}>
-        <Text className="text-white font-semibold text-base">Next: AI setup</Text>
-      </Pressable>
-    </ScrollView>
+      ) : null}
+
+      <View className="gap-4 mb-4">
+        <Input
+          label="Target weight (kg)"
+          icon={Scale}
+          keyboardType="decimal-pad"
+          value={targetWeight}
+          onChangeText={setTargetWeight}
+        />
+        <Input
+          label="Daily calories (kcal)"
+          icon={Flame}
+          keyboardType="number-pad"
+          value={calories}
+          onChangeText={setCalories}
+        />
+      </View>
+
+      <Card className="mb-4">
+        <Heading level={4} uppercase className="mb-3">
+          Macros
+        </Heading>
+        <View className="gap-4">
+          <Input label="Protein (g)" keyboardType="number-pad" value={protein} onChangeText={setProtein} />
+          <Input label="Carbs (g)" keyboardType="number-pad" value={carbs} onChangeText={setCarbs} />
+          <Input label="Fat (g)" keyboardType="number-pad" value={fat} onChangeText={setFat} />
+        </View>
+      </Card>
+
+      <Input
+        label="Daily steps"
+        icon={Footprints}
+        keyboardType="number-pad"
+        value={steps}
+        onChangeText={setSteps}
+        containerClassName="mb-4"
+      />
+    </Screen>
   )
 }

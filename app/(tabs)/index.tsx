@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, Pressable } from 'react-native'
+import { View } from 'react-native'
 import { useRouter } from 'expo-router'
+import {
+  Plus,
+  MessageCircle,
+  Activity as ActivityIcon,
+  Scale,
+  TrendingUp,
+  Sparkles,
+  AlertTriangle,
+  UtensilsCrossed,
+} from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useMealsStore } from '../../stores/mealsStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -8,18 +18,37 @@ import { useDailySummaryStore } from '../../stores/dailySummaryStore'
 import { useActivityStore } from '../../stores/activityStore'
 import { useHealthConnectStore } from '../../stores/healthConnectStore'
 import { MealCard } from '../../components/meals/MealCard'
-import { ProgressRing } from '../../components/ui/ProgressRing'
-import { MacroBar } from '../../components/ui/MacroBar'
+import {
+  Screen,
+  Card,
+  PressableCard,
+  Button,
+  Heading,
+  Text,
+  ProgressRing,
+  MacroBar,
+  EmptyState,
+} from '../../components/ui'
+import { useThemeColors } from '../../lib/theme'
 import { calcProgress, sumMeals } from '../../lib/utils/macros'
 import { sumSteps } from '../../lib/utils/activity'
 import { generateDailySummary } from '../../lib/api/dailySummary'
 import { shouldGenerateAfterLoad, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
+import type { LucideIcon } from 'lucide-react-native'
 
 // Fires the lazy coach-note generation at most once per app session per calendar day.
 let coachNoteAttemptDate: string | null = null
 
+function greeting(d: Date) {
+  const h = d.getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export default function HomeScreen() {
   const router = useRouter()
+  const colors = useThemeColors()
   const { user } = useAuthStore()
   const { meals, fetchTodayMeals, error: mealsError } = useMealsStore()
   const { goals, fetchGoals, error: profileError } = useProfileStore()
@@ -59,72 +88,123 @@ export default function HomeScreen() {
   const fatTarget = goals?.daily_fat_g ?? 70
   const stepsToday = Math.max(sumSteps(todayActivity), hcSteps)
   const stepsTarget = goals?.daily_steps_target ?? 8000
+  const caloriesLeft = Math.max(0, calorieTarget - totals.calories)
   const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError ?? lazyError
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-6">
-        <Text className="text-gray-500 text-sm">Good morning</Text>
-        <Text className="text-2xl font-bold text-gray-900 mb-6">Today&apos;s progress</Text>
+    <Screen scroll>
+      {/* Greeting */}
+      <View className="mt-1 mb-5">
+        <Text variant="caption" muted className="uppercase tracking-wide">
+          {greeting(new Date())}
+        </Text>
+        <Heading level={1} uppercase>Today</Heading>
+      </View>
+
+      {errorMessage ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      {/* Hero stats */}
+      <Card elevated className="mb-3">
+        <View className="flex-row items-baseline justify-between mb-4">
+          <View>
+            <Text variant="caption" muted className="uppercase tracking-wide">Calories left</Text>
+            <View className="flex-row items-baseline gap-1.5">
+              <Text className="font-display text-4xl text-foreground">{caloriesLeft}</Text>
+              <Text variant="bodySm" muted>of {calorieTarget}</Text>
+            </View>
+          </View>
+        </View>
         <View className="flex-row justify-around">
-          <ProgressRing percentage={calcProgress(totals.calories, calorieTarget)} label="Calories" value={`${totals.calories}`} color="#16a34a" />
-          <ProgressRing percentage={calcProgress(totals.protein, proteinTarget)} label="Protein" value={`${Math.round(totals.protein)}g`} color="#2563eb" />
-          <ProgressRing percentage={calcProgress(stepsToday, stepsTarget)} label="Steps" value={`${stepsToday}`} color="#d97706" />
+          <ProgressRing percentage={calcProgress(totals.calories, calorieTarget)} label="Calories" value={`${totals.calories}`} color={colors.primary} />
+          <ProgressRing percentage={calcProgress(totals.protein, proteinTarget)} label="Protein" value={`${Math.round(totals.protein)}g`} color={colors.info} />
+          <ProgressRing percentage={calcProgress(stepsToday, stepsTarget)} label="Steps" value={`${stepsToday}`} color={colors.warning} />
         </View>
+      </Card>
+
+      {/* Primary actions */}
+      <View className="flex-row gap-3 mb-3">
+        <Button label="Log Meal" variant="accent" icon={Plus} fullWidth={false} className="flex-1" onPress={() => router.push('/(tabs)/meals')} />
+        <Button label="Ask Coach" variant="secondary" icon={MessageCircle} fullWidth={false} className="flex-1" onPress={() => router.push('/(tabs)/chat')} />
       </View>
 
-      {errorMessage && (
-        <View className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <Text className="text-red-600 text-sm">{errorMessage}</Text>
+      {/* Secondary actions */}
+      <View className="flex-row gap-3 mb-5">
+        <QuickAction icon={ActivityIcon} label="Activity" onPress={() => router.push('/activity')} color={colors.primary} />
+        <QuickAction icon={Scale} label="InBody" onPress={() => router.push('/inbody')} color={colors.info} />
+        <QuickAction icon={TrendingUp} label="Progress" onPress={() => router.push('/progress')} color={colors.accent} />
+      </View>
+
+      {/* Macros */}
+      <Card className="mb-5">
+        <Heading level={4} uppercase className="mb-3">Macros</Heading>
+        <MacroBar label="Protein" consumed={totals.protein} target={proteinTarget} color={colors.macroProtein} />
+        <MacroBar label="Carbs" consumed={totals.carbs} target={carbsTarget} color={colors.macroCarbs} />
+        <MacroBar label="Fat" consumed={totals.fat} target={fatTarget} color={colors.macroFat} />
+      </Card>
+
+      {/* Coach note */}
+      {summary?.ai_coach_note ? (
+        <Card className="mb-5 bg-primary-soft border-0">
+          <View className="flex-row items-start gap-2.5">
+            <Sparkles size={18} color={colors.primary} />
+            <Text variant="bodySm" className="flex-1 text-foreground">{summary.ai_coach_note}</Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {/* Low-fuel prompt */}
+      {shouldShowLowFuelPrompt(totals.calories, calorieTarget, new Date()) ? (
+        <PressableCard className="mb-5 bg-accent-soft border-0" onPress={() => router.push('/(tabs)/chat')}>
+          <View className="flex-row items-start gap-2.5">
+            <AlertTriangle size={18} color={colors.accent} />
+            <View className="flex-1">
+              <Text variant="label" className="text-accent">Not enough food today</Text>
+              <Text variant="caption" muted className="mt-0.5">
+                You&apos;re well under your calorie target — tap to ask the coach for a meal idea.
+              </Text>
+            </View>
+          </View>
+        </PressableCard>
+      ) : null}
+
+      {/* Today's meals */}
+      <Heading level={4} uppercase className="mb-3">Today&apos;s meals</Heading>
+      {meals.length === 0 ? (
+        <EmptyState
+          icon={UtensilsCrossed}
+          title="No meals yet"
+          description="Log your first meal to start tracking today's macros."
+          actionLabel="Log a meal"
+          onAction={() => router.push('/(tabs)/meals')}
+        />
+      ) : (
+        <View className="gap-3">
+          {meals.map((m) => <MealCard key={m.id} meal={m} />)}
         </View>
       )}
+    </Screen>
+  )
+}
 
-      <View className="flex-row px-4 pt-4 gap-3 mb-4">
-        <Pressable className="flex-1 bg-green-600 rounded-xl py-4 items-center" onPress={() => router.push('/(tabs)/meals')}>
-          <Text className="text-white font-semibold">Log Meal</Text>
-        </Pressable>
-        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/(tabs)/chat')}>
-          <Text className="text-gray-700 font-semibold">Ask Coach</Text>
-        </Pressable>
-      </View>
-
-      <View className="flex-row px-4 gap-3 mb-4">
-        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/activity')}>
-          <Text className="text-gray-700 font-semibold">Log Activity</Text>
-        </Pressable>
-        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/inbody')}>
-          <Text className="text-gray-700 font-semibold">Add InBody</Text>
-        </Pressable>
-        <Pressable className="flex-1 bg-white rounded-xl py-4 items-center border border-gray-200" onPress={() => router.push('/progress')}>
-          <Text className="text-gray-700 font-semibold">Progress</Text>
-        </Pressable>
-      </View>
-
-      <View className="mx-4 mb-4 bg-white rounded-xl px-4 py-4 border border-gray-100">
-        <MacroBar label="Carbs" consumed={totals.carbs} target={carbsTarget} color="#7c3aed" />
-        <MacroBar label="Fat" consumed={totals.fat} target={fatTarget} color="#d97706" />
-      </View>
-
-      {summary?.ai_coach_note && (
-        <View className="mx-4 mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-          <Text className="text-xs text-amber-700">{summary.ai_coach_note}</Text>
-        </View>
-      )}
-
-      {shouldShowLowFuelPrompt(totals.calories, calorieTarget, new Date()) && (
-        <Pressable className="mx-4 mb-4 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3" onPress={() => router.push('/(tabs)/chat')}>
-          <Text className="text-orange-800 font-semibold text-sm">Not enough food today</Text>
-          <Text className="text-orange-700 text-xs mt-1">You are well under your calorie target — tap to ask the coach for a meal suggestion.</Text>
-        </Pressable>
-      )}
-
-      <View className="px-4">
-        <Text className="font-semibold text-gray-700 mb-3">Today&apos;s meals</Text>
-        {meals.length === 0
-          ? <Text className="text-gray-400 text-center py-8">No meals logged yet today</Text>
-          : meals.map(m => <MealCard key={m.id} meal={m} />)
-        }
-      </View>
-    </ScrollView>
+function QuickAction({
+  icon: Icon,
+  label,
+  onPress,
+  color,
+}: {
+  icon: LucideIcon
+  label: string
+  onPress: () => void
+  color: string
+}) {
+  return (
+    <PressableCard className="flex-1 items-center py-4" onPress={onPress}>
+      <Icon size={22} color={color} />
+      <Text variant="caption" className="mt-1.5 font-semibold">{label}</Text>
+    </PressableCard>
   )
 }

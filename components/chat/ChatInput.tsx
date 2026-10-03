@@ -1,4 +1,7 @@
-import { View, TextInput, Pressable, Text } from 'react-native'
+import { View, TextInput } from 'react-native'
+import { ArrowUp } from 'lucide-react-native'
+import { IconButton } from '../ui'
+import { useThemeColors } from '../../lib/theme'
 
 interface Props {
   value: string
@@ -8,26 +11,28 @@ interface Props {
 }
 
 export function ChatInput({ value, onChangeText, onSend, disabled }: Props) {
+  const colors = useThemeColors()
   const canSend = value.trim().length > 0 && !disabled
 
   return (
-    <View className="flex-row items-end px-4 py-3 bg-white border-t border-gray-100">
+    <View className="flex-row items-end gap-2 px-4 py-3 bg-surface border-t border-border">
       <TextInput
-        className="flex-1 border border-gray-200 rounded-2xl px-4 py-3 mr-2 max-h-28 bg-gray-50"
+        className="flex-1 font-sans text-base text-foreground border border-border-strong rounded-2xl px-4 py-3 max-h-28 bg-surface-muted"
         placeholder="Message your coach..."
+        placeholderTextColor={colors.mutedForeground}
         value={value}
         onChangeText={onChangeText}
         multiline
         returnKeyType="send"
         onSubmitEditing={onSend}
       />
-      <Pressable
+      <IconButton
+        icon={ArrowUp}
+        accessibilityLabel="Send message"
+        variant="primary"
         onPress={onSend}
         disabled={!canSend}
-        className={`w-10 h-10 rounded-full items-center justify-center ${canSend ? 'bg-green-600' : 'bg-gray-200'}`}
-      >
-        <Text className="text-white font-bold">↑</Text>
-      </Pressable>
+      />
     </View>
   )
 }

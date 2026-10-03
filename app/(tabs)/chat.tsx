@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, FlatList, Text, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { View, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { MessageCircle } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { ChatMessage } from '../../components/chat/ChatMessage'
 import { ChatInput } from '../../components/chat/ChatInput'
+import { Heading, Text, EmptyState } from '../../components/ui'
+import { useThemeColors } from '../../lib/theme'
 
 export default function ChatScreen() {
   const { user } = useAuthStore()
   const { messages, loading, error, sendMessage, loadHistory } = useChatStore()
   const [input, setInput] = useState('')
   const listRef = useRef<FlatList>(null)
+  const insets = useSafeAreaInsets()
+  const colors = useThemeColors()
 
   useEffect(() => {
     if (user) loadHistory(user.id)
@@ -25,28 +31,45 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-gray-50" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View className="bg-white px-6 pt-14 pb-4 border-b border-gray-100">
-        <Text className="text-xl font-bold text-gray-900">Coach</Text>
-        <Text className="text-gray-500 text-sm">Your AI health coach</Text>
+    <KeyboardAvoidingView
+      className="flex-1 bg-background"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View className="px-5 pb-3 border-b border-border" style={{ paddingTop: insets.top + 8 }}>
+        <Heading level={3} uppercase>
+          Coach
+        </Heading>
+        <Text variant="bodySm" muted>
+          Your AI health coach
+        </Text>
       </View>
-      {messages.length === 0 && (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-gray-400 text-center">
-            Say hello to your coach! You can log meals, check your goals, get suggestions, or just ask questions.
-          </Text>
+
+      {messages.length === 0 ? (
+        <View className="flex-1">
+          <EmptyState
+            icon={MessageCircle}
+            title="Say hello to your coach"
+            description="You can log meals, check your goals, get suggestions, or just ask questions."
+            className="flex-1"
+          />
         </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={messages}
+          keyExtractor={(m) => m.id}
+          renderItem={({ item }) => <ChatMessage role={item.role} content={item.content} />}
+          className="flex-1 px-4 pt-4"
+          onContentSizeChange={() => listRef.current?.scrollToEnd()}
+        />
       )}
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        renderItem={({ item }) => <ChatMessage role={item.role} content={item.content} />}
-        className="flex-1 px-4 pt-4"
-        onContentSizeChange={() => listRef.current?.scrollToEnd()}
-      />
-      {loading && <ActivityIndicator className="py-2" color="#16a34a" />}
-      {error && <Text className="text-red-500 text-xs px-4 pb-1">{error}</Text>}
+
+      {loading ? <ActivityIndicator className="py-2" color={colors.primary} /> : null}
+      {error ? (
+        <Text variant="caption" className="text-danger px-4 pb-1">
+          {error}
+        </Text>
+      ) : null}
       <ChatInput value={input} onChangeText={setInput} onSend={handleSend} disabled={loading} />
     </KeyboardAvoidingView>
   )

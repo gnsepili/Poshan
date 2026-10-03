@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "platforms": [
       "android",
       "ios",
@@ -73,7 +73,9 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-font",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {},

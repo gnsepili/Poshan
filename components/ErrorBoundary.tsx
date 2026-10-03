@@ -26,11 +26,19 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <View className="flex-1 items-center justify-center bg-gray-50 px-8">
-          <Text className="text-lg font-bold text-gray-900 mb-2">Something went wrong</Text>
-          <Text className="text-gray-500 text-center mb-6">The app hit an unexpected error. It has been logged.</Text>
-          <Pressable className="bg-green-600 rounded-lg px-6 py-3" onPress={() => this.setState({ hasError: false })}>
-            <Text className="text-white font-semibold">Try again</Text>
+        <View className="flex-1 items-center justify-center bg-background px-8">
+          <Text className="font-display text-2xl uppercase tracking-wide text-foreground mb-2">
+            Something went wrong
+          </Text>
+          <Text className="font-sans text-base text-muted-foreground text-center mb-6">
+            The app hit an unexpected error. It has been logged.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            className="bg-primary rounded-2xl px-6 h-12 justify-center active:bg-primary-pressed"
+            onPress={() => this.setState({ hasError: false })}
+          >
+            <Text className="font-bold text-base text-on-primary">Try again</Text>
           </Pressable>
         </View>
       )

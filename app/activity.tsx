@@ -1,14 +1,36 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View } from 'react-native'
 import { useAuthStore } from '../stores/authStore'
 import { useActivityStore } from '../stores/activityStore'
 import { ActivityType } from '../types'
+import { Screen, Card, Chip, Input, Button, Heading, Text, EmptyState } from '../components/ui'
+import {
+  Footprints,
+  Zap,
+  Dumbbell,
+  Bike,
+  Droplets,
+  Flower2,
+  Ellipsis,
+  Activity as ActivityIcon,
+} from 'lucide-react-native'
+import type { LucideIcon } from 'lucide-react-native'
 
 const TYPES: ActivityType[] = ['walk', 'run', 'gym', 'cycle', 'swim', 'yoga', 'other']
 
+const TYPE_ICON: Record<ActivityType, LucideIcon> = {
+  walk: Footprints,
+  run: Zap,
+  gym: Dumbbell,
+  cycle: Bike,
+  swim: Droplets,
+  yoga: Flower2,
+  other: Ellipsis,
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
 export default function ActivityScreen() {
-  const router = useRouter()
   const { user } = useAuthStore()
   const { todayActivity, fetchTodayActivity, addActivity, loading, error } = useActivityStore()
   const [type, setType] = useState<ActivityType>('walk')
@@ -33,53 +55,80 @@ export default function ActivityScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="bg-white px-6 pt-14 pb-4 border-b border-gray-100 flex-row items-center">
-        <Pressable onPress={() => router.back()} className="mr-3"><Text className="text-green-600 text-lg">‹ Back</Text></Pressable>
-        <Text className="text-2xl font-bold text-gray-900">Log activity</Text>
+    <Screen back title="Log activity" scroll>
+      {error ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
+          <Text variant="bodySm" className="text-danger">{error}</Text>
+        </View>
+      ) : null}
+
+      <Text variant="label" className="mb-2">Type</Text>
+      <View className="flex-row flex-wrap gap-2 mb-5">
+        {TYPES.map((t) => (
+          <Chip
+            key={t}
+            label={capitalize(t)}
+            icon={TYPE_ICON[t]}
+            selected={type === t}
+            onPress={() => setType(t)}
+          />
+        ))}
       </View>
 
-      {error && <Text className="text-red-500 mx-6 mt-4">{error}</Text>}
+      <View className="gap-4 mb-5">
+        <Input
+          label="Duration (min)"
+          keyboardType="number-pad"
+          value={duration}
+          onChangeText={setDuration}
+          placeholder="0"
+        />
+        <Input
+          label="Steps"
+          keyboardType="number-pad"
+          value={steps}
+          onChangeText={setSteps}
+          placeholder="0"
+        />
+        <Input
+          label="Calories burned (kcal)"
+          keyboardType="number-pad"
+          value={calories}
+          onChangeText={setCalories}
+          placeholder="0"
+        />
+        <Input
+          label="Notes"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Optional"
+          multiline
+        />
+      </View>
 
-      <View className="px-6 pt-4">
-        <Text className="text-gray-600 mb-1">Type</Text>
-        <View className="flex-row flex-wrap gap-2 mb-4">
-          {TYPES.map((t) => (
-            <Pressable key={t} onPress={() => setType(t)} className={`px-4 py-2 rounded-lg border ${type === t ? 'bg-green-600 border-green-600' : 'border-gray-300'}`}>
-              <Text className={type === t ? 'text-white' : 'text-gray-700'}>{t}</Text>
-            </Pressable>
+      <Button label="Save activity" onPress={handleSave} loading={loading} className="mb-6" />
+
+      <Heading level={4} uppercase className="mb-3">Today&apos;s activity</Heading>
+      {todayActivity.length === 0 ? (
+        <EmptyState
+          icon={ActivityIcon}
+          title="No activity logged yet"
+          description="Log a walk, workout, or other activity to see it here."
+        />
+      ) : (
+        <View className="gap-3">
+          {todayActivity.map((a) => (
+            <Card key={a.id}>
+              <View className="flex-row justify-between items-start mb-1">
+                <Text variant="label" className="capitalize">{a.activity_type}</Text>
+                <Text className="font-display text-xl text-primary">{a.calories_burned} kcal</Text>
+              </View>
+              <Text variant="caption" muted>{a.duration_min} min · {a.steps} steps</Text>
+              {a.notes ? <Text variant="caption" muted className="mt-1">{a.notes}</Text> : null}
+            </Card>
           ))}
         </View>
-        {[
-          { label: 'Duration (min)', value: duration, setter: setDuration },
-          { label: 'Steps', value: steps, setter: setSteps },
-          { label: 'Calories burned (kcal)', value: calories, setter: setCalories },
-        ].map(({ label, value, setter }) => (
-          <View key={label} className="mb-4">
-            <Text className="text-gray-600 mb-1">{label}</Text>
-            <TextInput className="border border-gray-300 rounded-lg px-4 py-3" keyboardType="number-pad" value={value} onChangeText={setter} placeholder="0" />
-          </View>
-        ))}
-        <Text className="text-gray-600 mb-1">Notes</Text>
-        <TextInput className="border border-gray-300 rounded-lg px-4 py-3 mb-6" value={notes} onChangeText={setNotes} placeholder="Optional" multiline />
-        <Pressable className="bg-green-600 rounded-lg py-4 items-center mb-6" onPress={handleSave} disabled={loading}>
-          {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Save activity</Text>}
-        </Pressable>
-
-        <Text className="font-semibold text-gray-700 mb-3">Today's activity</Text>
-        {todayActivity.length === 0
-          ? <Text className="text-gray-400 text-center py-8">No activity logged yet today</Text>
-          : todayActivity.map((a) => (
-            <View key={a.id} className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
-              <View className="flex-row justify-between">
-                <Text className="font-semibold text-gray-900 capitalize">{a.activity_type}</Text>
-                <Text className="text-green-700 font-bold">{a.calories_burned} kcal</Text>
-              </View>
-              <Text className="text-xs text-gray-500 mt-1">{a.duration_min} min · {a.steps} steps</Text>
-              {a.notes ? <Text className="text-xs text-gray-500 mt-1">{a.notes}</Text> : null}
-            </View>
-          ))}
-      </View>
-    </ScrollView>
+      )}
+    </Screen>
   )
 }
