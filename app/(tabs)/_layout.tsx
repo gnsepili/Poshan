@@ -18,6 +18,7 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {
@@ -29,7 +30,7 @@ export default function TabsLayout() {
         },
         tabBarLabelStyle: {
           fontFamily: 'Barlow_600SemiBold',
-          fontSize: 11,
+          fontSize: 12,
         },
         tabBarItemStyle: { paddingTop: 6 },
       }}

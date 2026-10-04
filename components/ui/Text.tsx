@@ -3,11 +3,11 @@ import { Text as RNText, TextProps } from 'react-native'
 type TextVariant = 'body' | 'bodyLg' | 'bodySm' | 'caption' | 'label' | 'number' | 'numberLg'
 
 const VARIANT: Record<TextVariant, string> = {
-  bodyLg: 'font-sans text-lg leading-7',
-  body: 'font-sans text-base leading-6',
-  bodySm: 'font-sans text-sm leading-5',
-  caption: 'font-medium text-xs leading-4',
-  label: 'font-semibold text-sm leading-5',
+  bodyLg: 'font-sans text-lg',
+  body: 'font-sans text-base',
+  bodySm: 'font-sans text-sm',
+  caption: 'font-medium text-xs',
+  label: 'font-semibold text-sm',
   number: 'font-bold text-base',
   numberLg: 'font-display text-4xl',
 }

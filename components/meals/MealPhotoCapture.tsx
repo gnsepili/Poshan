@@ -11,7 +11,8 @@ import { Text } from '../ui'
 import { useThemeColors } from '../../lib/theme'
 
 interface Props {
-  onUploaded: (url: string) => void
+  /** Storage path ("<userId>/<file>.jpg") in the private meal-photos bucket. */
+  onUploaded: (path: string) => void
 }
 
 export function MealPhotoCapture({ onUploaded }: Props) {
@@ -40,8 +41,8 @@ export function MealPhotoCapture({ onUploaded }: Props) {
         setUploadError(`Couldn't upload the photo: ${error.message}`)
         return
       }
-      const { data } = supabase.storage.from('meal-photos').getPublicUrl(fileName)
-      onUploaded(data.publicUrl)
+      // Private bucket: hand back the storage path; it is signed whenever it's displayed.
+      onUploaded(fileName)
     } catch (e) {
       logError('meal-photo-capture', e)
       setUploadError("Couldn't take or read the photo. Check camera permission and try again.")

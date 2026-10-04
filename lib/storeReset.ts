@@ -8,10 +8,12 @@ import { useInbodyStore } from '../stores/inbodyStore'
 import { useChatStore } from '../stores/chatStore'
 import { usePushStore } from '../stores/pushStore'
 import { useHealthConnectStore } from '../stores/healthConnectStore'
+import { clearSignedPhotoCache } from './signedPhotos'
 
 // Wipe every per-user data store on sign-out so a second user on the same device
 // never sees the previous user's cached data (Review Focus #5). authStore resets itself.
 export async function resetAllStores(): Promise<void> {
+  clearSignedPhotoCache()
   useMealsStore.setState({ meals: [], mealsDay: null, loading: false, error: null, pendingCount: 0, flushing: false })
   useActivityStore.setState({ todayActivity: [], activityDay: null, loading: false, error: null })
   useDailySummaryStore.setState({ summary: null, summaryDay: null, recent: [], loading: false, loaded: false, error: null })

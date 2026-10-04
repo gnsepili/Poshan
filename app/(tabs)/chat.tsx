@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { View, FlatList, ActivityIndicator } from 'react-native'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MessageCircle } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
@@ -31,10 +32,10 @@ export default function ChatScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    // keyboard-controller's padding mode works on Android edge-to-edge, where RN's
+    // KeyboardAvoidingView leaves the input behind the keyboard.
+    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <View className="px-5 pb-3 border-b border-border" style={{ paddingTop: insets.top + 8 }}>
         <Heading level={3} uppercase>
           Coach
@@ -72,5 +73,6 @@ export default function ChatScreen() {
       ) : null}
       <ChatInput value={input} onChangeText={setInput} onSend={handleSend} disabled={loading} />
     </KeyboardAvoidingView>
+    </View>
   )
 }

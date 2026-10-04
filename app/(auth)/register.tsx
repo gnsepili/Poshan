@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { View, KeyboardAvoidingView, Platform } from 'react-native'
+import { View } from 'react-native'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
 import { Mail, Lock, Eye, EyeOff, Leaf } from 'lucide-react-native'
@@ -17,10 +18,8 @@ export default function RegisterScreen() {
   const colors = useThemeColors()
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      className="flex-1 bg-background"
-    >
+    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <View
         className="flex-1 justify-center px-6"
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
@@ -81,5 +80,6 @@ export default function RegisterScreen() {
         </View>
       </View>
     </KeyboardAvoidingView>
+    </View>
   )
 }

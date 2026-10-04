@@ -13,6 +13,7 @@ import { MealType } from '../../types'
 import { Screen, Heading, Text, Button, IconButton, Input, Chip, EmptyState } from '../../components/ui'
 import { useThemeColors } from '../../lib/theme'
 import { useAutoRefresh } from '../../lib/hooks/useAutoRefresh'
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -207,11 +208,12 @@ export default function MealsScreen() {
             />
           </View>
 
-          <ScrollView
-            className="flex-1 px-5"
+          <KeyboardAwareScrollView
+            style={{ flex: 1 }}
+            bottomOffset={24}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
           >
             {isOffline ? (
               <View className="bg-accent-soft rounded-2xl px-4 py-3 mb-4">
@@ -315,7 +317,7 @@ export default function MealsScreen() {
                 />
               </>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
     </Screen>

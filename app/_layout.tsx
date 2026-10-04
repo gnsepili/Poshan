@@ -6,6 +6,7 @@ import NetInfo from '@react-native-community/netinfo'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import {
@@ -162,6 +163,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <SafeAreaProvider>
+          <KeyboardProvider>
           <StatusBar style="auto" />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
@@ -172,6 +174,7 @@ export default function RootLayout() {
             <Stack.Screen name="progress" />
             <Stack.Screen name="health-connect" />
           </Stack>
+          </KeyboardProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

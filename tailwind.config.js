@@ -50,6 +50,18 @@ module.exports = {
           calories: token('macro-calories'),
         },
       },
+      // One step larger than Tailwind's defaults: testers found the app's type small next
+      // to other fitness apps. Every text-* class (and the Text variants) inherits this.
+      fontSize: {
+        xs: ['13px', { lineHeight: '18px' }],
+        sm: ['15px', { lineHeight: '21px' }],
+        base: ['17px', { lineHeight: '24px' }],
+        lg: ['19px', { lineHeight: '27px' }],
+        xl: ['22px', { lineHeight: '29px' }],
+        '2xl': ['26px', { lineHeight: '32px' }],
+        '3xl': ['32px', { lineHeight: '38px' }],
+        '4xl': ['38px', { lineHeight: '42px' }],
+      },
       fontFamily: {
         // Barlow Condensed for impact headings; Barlow for body/UI.
         display: ['BarlowCondensed_700Bold'],

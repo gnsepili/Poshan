@@ -238,7 +238,9 @@ describe('mealsStore', () => {
 
     expect(upload).toHaveBeenCalledTimes(1)
     expect(insert).toHaveBeenCalledTimes(1)
-    expect((insert.mock.calls[0][0] as { photo_url: string }).photo_url).toBe('https://cdn/a.jpg')
+    // The bucket is private: store the object path (signed on display), never a public URL.
+    expect((insert.mock.calls[0][0] as { photo_url: string }).photo_url).toBe('u1/a.jpg')
+    expect(getPublicUrl).not.toHaveBeenCalled()
     expect(useMealsStore.getState().pendingCount).toBe(0)
   })
 
@@ -263,7 +265,7 @@ describe('mealsStore', () => {
     expect(firstSetItemOrder).toBeLessThan(insertOrder)
     // And that persisted intermediate write must carry the remote photo_url with no local URI.
     const firstWrite = JSON.parse((AsyncStorage.setItem as jest.Mock).mock.calls[0][1])
-    expect(firstWrite[0].photo_url).toBe('https://cdn/a.jpg')
+    expect(firstWrite[0].photo_url).toBe('u1/a.jpg')
     expect(firstWrite[0].photo_local_uri).toBeUndefined()
   })
 

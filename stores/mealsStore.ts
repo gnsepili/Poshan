@@ -29,7 +29,8 @@ async function writeQueue(q: QueuedMeal[]): Promise<void> {
   await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(q))
 }
 
-// A queued local photo is uploaded on flush; returns the public URL or undefined.
+// A queued local photo is uploaded on flush; returns its storage path (the bucket is
+// private — photos are shown via signed URLs) or undefined if the upload failed.
 async function uploadQueuedPhoto(item: QueuedMeal): Promise<string | undefined> {
   if (!item.photo_local_uri) return undefined
   const fileName = `${item.user_id}/${item.id}.jpg`
@@ -38,7 +39,7 @@ async function uploadQueuedPhoto(item: QueuedMeal): Promise<string | undefined> 
     .from('meal-photos')
     .upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: true })
   if (error) return undefined
-  return supabase.storage.from('meal-photos').getPublicUrl(fileName).data.publicUrl
+  return fileName
 }
 
 const isDuplicateKey = (message: string): boolean => /duplicate key|already exists/i.test(message)

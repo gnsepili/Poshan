@@ -1,8 +1,9 @@
-import { View } from 'react-native'
+import { Image, View } from 'react-native'
 import { Sparkles } from 'lucide-react-native'
 import { Meal } from '../../types'
 import { Card, Text } from '../ui'
 import { useThemeColors } from '../../lib/theme'
+import { useSignedPhoto } from '../../lib/hooks/useSignedPhoto'
 
 function MacroPill({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -17,8 +18,17 @@ function MacroPill({ label, value, color }: { label: string; value: number; colo
 
 export function MealCard({ meal }: { meal: Meal }) {
   const colors = useThemeColors()
+  const photo = useSignedPhoto('meal-photos', meal.photo_url)
   return (
     <Card>
+      {photo ? (
+        <Image
+          source={{ uri: photo }}
+          className="w-full h-44 rounded-xl mb-3 bg-surface-muted"
+          resizeMode="cover"
+          accessibilityLabel={`Photo of ${meal.description || 'meal'}`}
+        />
+      ) : null}
       <View className="flex-row justify-between items-start mb-2">
         <Text variant="label" className="flex-1 mr-3" numberOfLines={2}>
           {meal.description}

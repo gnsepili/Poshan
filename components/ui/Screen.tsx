@@ -1,5 +1,6 @@
 import { ReactNode } from 'react'
-import { RefreshControl, ScrollView, View } from 'react-native'
+import { RefreshControl, View } from 'react-native'
+import { KeyboardAwareScrollView, KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
@@ -83,8 +84,10 @@ export function Screen({
       ) : null}
 
       {scroll ? (
-        <ScrollView
-          className="flex-1"
+        // Scrolls the focused input above the keyboard (and above a sticky footer).
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          bottomOffset={footer ? 96 : 24}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: (footer ? 16 : insets.bottom) + 24 }}
@@ -95,18 +98,21 @@ export function Screen({
           }
         >
           {body}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         <View className="flex-1">{body}</View>
       )}
 
       {footer ? (
-        <View
-          className={`border-t border-border bg-surface ${padded ? 'px-5' : ''} pt-3`}
-          style={{ paddingBottom: insets.bottom + 12 }}
-        >
-          {footer}
-        </View>
+        // Rides up with the keyboard so the primary action stays reachable while typing.
+        <KeyboardStickyView offset={{ opened: insets.bottom }}>
+          <View
+            className={`border-t border-border bg-surface ${padded ? 'px-5' : ''} pt-3`}
+            style={{ paddingBottom: insets.bottom + 12 }}
+          >
+            {footer}
+          </View>
+        </KeyboardStickyView>
       ) : null}
     </View>
   )
