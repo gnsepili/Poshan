@@ -95,10 +95,11 @@ export const usePlansStore = create<PlansState>()(
       logEvent('plan_generated', { kind: 'workout' }, userId)
     },
 
-    regenerateWorkoutDay: (dayIndex) => runWorkoutEdit(`day:${dayIndex}`, () => apiRegenerateDay(dayIndex)),
+    regenerateWorkoutDay: (dayIndex) =>
+      runWorkoutEdit(`day:${dayIndex}`, () => apiRegenerateDay(get().workoutPlan?.id ?? '', dayIndex)),
 
     swapWorkoutExercise: (dayIndex, exerciseIndex) =>
-      runWorkoutEdit(`swap:${dayIndex}:${exerciseIndex}`, () => apiSwapExercise(dayIndex, exerciseIndex)),
+      runWorkoutEdit(`swap:${dayIndex}:${exerciseIndex}`, () => apiSwapExercise(get().workoutPlan?.id ?? '', dayIndex, exerciseIndex)),
   }
   }),
   cacheOptions<PlansState>('plans', ['mealPlan', 'workoutPlan'])

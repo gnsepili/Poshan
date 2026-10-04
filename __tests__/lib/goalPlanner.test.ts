@@ -1,4 +1,4 @@
-import { planTargets, PACE_KG_PER_WEEK, suggestedTargetWeight } from '../../lib/utils/goalPlanner'
+import { planTargets, PACE_KG_PER_WEEK, suggestedTargetWeight, goalDirectionError } from '../../lib/utils/goalPlanner'
 
 const ganesh = { age: 28, sex: 'male' as const, height_cm: 175, current_weight_kg: 94.2, activity_level: 'moderate' as const }
 
@@ -46,5 +46,20 @@ describe('suggestedTargetWeight', () => {
     expect(suggestedTargetWeight(ganesh, 'lose')).toBeLessThan(94.2)
     expect(suggestedTargetWeight(ganesh, 'gain')).toBeGreaterThan(94.2)
     expect(suggestedTargetWeight(ganesh, 'maintain')).toBe(94)
+  })
+})
+
+describe('edge cases', () => {
+  it('never turns a fat-loss plan into a surplus when maintenance is below the calorie floor', () => {
+    const tiny = { age: 70, sex: 'female' as const, height_cm: 145, current_weight_kg: 45, activity_level: 'sedentary' as const }
+    const p = planTargets(tiny, { goal: 'lose', targetWeightKg: 42, pace: 'steady' })
+    expect(p.calories).toBeLessThanOrEqual(p.maintenanceCalories)
+  })
+
+  it('flags a target that contradicts the goal direction', () => {
+    expect(goalDirectionError('lose', 90, 95)).toMatch(/below/)
+    expect(goalDirectionError('gain', 90, 85)).toMatch(/above/)
+    expect(goalDirectionError('lose', 90, 80)).toBeNull()
+    expect(goalDirectionError('maintain', 90, 92)).toBeNull()
   })
 })

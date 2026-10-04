@@ -146,6 +146,19 @@ describe('chatStore', () => {
       return c
     }
 
+    it('a reply that arrives after the user switched threads does not land in the thread on screen', async () => {
+      useChatStore.setState({ conversationId: 'c1', messages: [], conversations: [] })
+      let resolve: (v: unknown) => void = () => {}
+      ;(sendAgentMessage as jest.Mock).mockReturnValue(new Promise((r) => { resolve = r }))
+      const pending = useChatStore.getState().sendMessage('hello')
+      useChatStore.getState().startNewConversation()
+      resolve({ reply: 'late reply', conversation_id: 'c1', title: null })
+      await pending
+      expect(useChatStore.getState().conversationId).toBeNull()
+      expect(useChatStore.getState().messages.map((m) => m.content)).not.toContain('late reply')
+      expect(useChatStore.getState().conversations[0]?.id).toBe('c1')
+    })
+
     it('startNewConversation clears the current thread', () => {
       useChatStore.setState({ messages: [{ id: 'x' }] as never, conversationId: 'conv-1', error: 'old' })
       useChatStore.getState().startNewConversation()

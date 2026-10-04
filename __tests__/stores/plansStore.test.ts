@@ -81,9 +81,10 @@ describe('plansStore', () => {
         busyDuring = usePlansStore.getState().workoutBusy
         return row([{ day: 'Monday', focus: 'Pull', exercises: [] }])
       })
+      usePlansStore.setState({ workoutPlan: row([]) as never })
       await usePlansStore.getState().regenerateWorkoutDay(0)
       expect(busyDuring).toBe('day:0')
-      expect(regenerateWorkoutDay).toHaveBeenCalledWith(0)
+      expect(regenerateWorkoutDay).toHaveBeenCalledWith('w2', 0)
 
       ;(swapWorkoutExercise as jest.Mock).mockImplementation(async () => {
         busyDuring = usePlansStore.getState().workoutBusy
@@ -91,7 +92,7 @@ describe('plansStore', () => {
       })
       await usePlansStore.getState().swapWorkoutExercise(0, 2)
       expect(busyDuring).toBe('swap:0:2')
-      expect(swapWorkoutExercise).toHaveBeenCalledWith(0, 2)
+      expect(swapWorkoutExercise).toHaveBeenCalledWith('w2', 0, 2)
       expect(usePlansStore.getState().workoutPlan?.plan_json.days[0].focus).toBe('Pull')
       expect(usePlansStore.getState().workoutBusy).toBeNull()
     })

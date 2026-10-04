@@ -25,15 +25,14 @@ function Group<T extends string | number>({ label, options, value, onChange, for
 export default function WorkoutPreferencesScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { profile, goals, upsertProfile, loading, error } = useProfileStore()
+  const { profile, goals, saveWorkoutPrefs, loading, error } = useProfileStore()
   const { generateWorkoutPlan } = usePlansStore()
   const [prefs, setPrefs] = useState<WorkoutPrefs>(profile?.workout_prefs ?? defaultWorkoutPrefs(goals?.goal_type))
   const set = <K extends keyof WorkoutPrefs>(key: K) => (v: WorkoutPrefs[K]) => setPrefs((p) => ({ ...p, [key]: v }))
 
   const save = async (rebuild: boolean) => {
     if (!user) return
-    await upsertProfile({ id: user.id, workout_prefs: prefs })
-    if (useProfileStore.getState().error) return
+    if (!(await saveWorkoutPrefs(user.id, prefs))) return
     router.back()
     if (rebuild) generateWorkoutPlan(user.id)
   }

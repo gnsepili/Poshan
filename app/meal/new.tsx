@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Image, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
@@ -37,7 +37,16 @@ export default function NewMealScreen() {
   const { addMeal } = useMealsStore()
   const offline = useNetInfo().isConnected === false
 
-  const [phase, setPhase] = useState<Phase>(offline ? 'manual' : 'capture')
+  const [phase, setPhase] = useState<Phase>('capture')
+  // NetInfo reports null on the first render: switch to manual entry once we know we're offline.
+  useEffect(() => {
+    if (offline && phase === 'capture') setPhase('manual')
+  }, [offline])
+  const savingRef = useRef(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+  }, [])
   const [localUri, setLocalUri] = useState<string | null>(null)
   const [photoPath, setPhotoPath] = useState<string | null>(null)
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null)
@@ -92,8 +101,19 @@ export default function NewMealScreen() {
     }
   }
 
+  // Back to the camera: forget the previous photo's analysis so it can't be saved with new values.
+  const retake = () => {
+    setAnalysis(null)
+    setPhotoPath(null)
+    setLocalUri(null)
+    setEditing(false)
+    setError(null)
+    for (const clear of [setTitle, setCalories, setProtein, setCarbs, setFat, setFiber]) clear('')
+    setPhase('capture')
+  }
+
   const save = async () => {
-    if (!user) return
+    if (!user || savingRef.current) return
     const macros = parseManualMacros({ calories, protein, carbs, fat, fiber })
     if (!macros) {
       setError('Enter valid non-negative numbers for calories, protein, carbs and fat.')
@@ -101,6 +121,7 @@ export default function NewMealScreen() {
       return
     }
     setError(null)
+    savingRef.current = true
     setSaving(true)
     try {
       const result = await addMeal({
@@ -120,10 +141,11 @@ export default function NewMealScreen() {
       }
       setDoneDetail(result.status === 'queued' ? "Saved offline — it'll sync when you're back online." : `${macros.total_calories} kcal added to today`)
       setPhase('done')
-      setTimeout(() => router.back(), 1100)
+      closeTimer.current = setTimeout(() => router.back(), 1100)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save the meal.')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -195,7 +217,7 @@ export default function NewMealScreen() {
           <View className="gap-4">
             {typeChips}
             {editing ? valueFields : null}
-            <Button label="Retake photo" variant="ghost" icon={Camera} onPress={() => setPhase('capture')} />
+            <Button label="Retake photo" variant="ghost" icon={Camera} onPress={retake} />
           </View>
         </MealResult>
       </Screen>
@@ -231,7 +253,7 @@ export default function NewMealScreen() {
         <View className="gap-4">
           {typeChips}
           {valueFields}
-          {!offline ? <Button label="Snap a photo instead" variant="ghost" icon={Camera} onPress={() => setPhase('capture')} /> : null}
+          {!offline ? <Button label="Snap a photo instead" variant="ghost" icon={Camera} onPress={retake} /> : null}
         </View>
       </Screen>
     )

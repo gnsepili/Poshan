@@ -70,8 +70,9 @@ export const useChatStore = create<ChatState>()(
         s.error = null
       })
       try {
-        const { reply, conversation_id, title } = await sendAgentMessage(content, get().conversationId ?? undefined)
-        const threadId = conversation_id ?? get().conversationId ?? ''
+        const sentFrom = get().conversationId
+        const { reply, conversation_id, title } = await sendAgentMessage(content, sentFrom ?? undefined)
+        const threadId = conversation_id ?? sentFrom ?? ''
         const now = new Date().toISOString()
         const assistantMsg: ChatHistoryMessage = {
           id: randomUUID(),
@@ -81,10 +82,14 @@ export const useChatStore = create<ChatState>()(
           created_at: now,
         }
         set((s) => {
-          s.messages.push(assistantMsg)
-          s.conversationId = threadId || null
           s.loading = false
-          // Keep the thread list fresh: move this thread to the top (adding it if new).
+          // Only touch the visible chat if the user is still on the thread this was sent from
+          // (they may have opened another thread or started a new one meanwhile).
+          if (s.conversationId === sentFrom) {
+            s.messages.push(assistantMsg)
+            s.conversationId = threadId || null
+          }
+          // Either way keep the thread list fresh: move this thread to the top (adding it if new).
           if (threadId) {
             const existing = s.conversations.find((c) => c.id === threadId)
             s.conversations = [

@@ -100,4 +100,17 @@ describe('profileStore', () => {
     expect(useProfileStore.getState().goals).toEqual(mockGoals)
     expect(useProfileStore.getState().error).toBeNull()
   })
+
+  it('saveWorkoutPrefs updates only the prefs column (an upsert would trip NOT NULL profile columns)', async () => {
+    useProfileStore.setState({ profile: { id: 'u1', age: 28 } as never })
+    const single = jest.fn().mockResolvedValue({ data: { id: 'u1', age: 28, workout_prefs: { days_per_week: 4 } }, error: null })
+    const select = jest.fn().mockReturnValue({ single })
+    const eq = jest.fn().mockReturnValue({ select })
+    const update = jest.fn().mockReturnValue({ eq })
+    ;(supabase.from as jest.Mock).mockReturnValue({ update })
+    await expect(useProfileStore.getState().saveWorkoutPrefs('u1', { days_per_week: 4 } as never)).resolves.toBe(true)
+    expect(update).toHaveBeenCalledWith({ workout_prefs: { days_per_week: 4 } })
+    expect(eq).toHaveBeenCalledWith('id', 'u1')
+    expect(useProfileStore.getState().profile?.workout_prefs).toEqual({ days_per_week: 4 })
+  })
 })

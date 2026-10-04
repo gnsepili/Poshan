@@ -4,17 +4,20 @@ import { Home, ClipboardList, Camera, MessageCircle, User } from 'lucide-react-n
 import { PressableScale } from '../../components/motion'
 import { useThemeColors } from '../../lib/theme'
 
-// Raised orange camera button in the middle of the tab bar.
+// Orange camera button in the middle of the tab bar (kept inside the bar so the whole
+// button is tappable on Android).
 function SnapButton() {
   const router = useRouter()
   const colors = useThemeColors()
   return (
     <View className="flex-1 items-center">
       <PressableScale
-        onPress={() => router.push('/meal/new')}
+        // navigate (not push) so a double tap can't open the snap screen twice.
+        onPress={() => router.navigate('/meal/new')}
         accessibilityRole="button"
         accessibilityLabel="Snap a meal"
-        className="h-14 w-14 rounded-full items-center justify-center -mt-5"
+        hitSlop={8}
+        className="h-12 w-12 rounded-full items-center justify-center mt-1"
         style={{ backgroundColor: colors.accent }}
       >
         <Camera size={26} color={colors.onAccent} />

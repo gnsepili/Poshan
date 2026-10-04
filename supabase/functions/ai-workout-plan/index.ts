@@ -84,13 +84,15 @@ function cleanExercise(e: any) {
 
 // deno-lint-ignore no-explicit-any
 function cleanDay(d: any, fallbackName: string) {
-  const rest = Boolean(d?.rest)
+  // A missing day, or a "training" day with no exercises, is a rest day.
+  const exercisesIn = Array.isArray(d?.exercises) ? d.exercises : []
+  const rest = !d || Boolean(d.rest) || exercisesIn.length === 0
   return {
     day: typeof d?.day === 'string' && d.day ? d.day : fallbackName,
     rest,
     focus: String(d?.focus ?? (rest ? 'Rest' : 'Workout')).slice(0, 60),
     duration_min: rest ? 0 : Math.min(150, Math.max(10, Math.round(Number(d?.duration_min) || 45))),
-    exercises: rest ? [] : (Array.isArray(d?.exercises) ? d.exercises : []).slice(0, 12).map(cleanExercise),
+    exercises: rest ? [] : exercisesIn.slice(0, 12).map(cleanExercise),
   }
 }
 
@@ -157,8 +159,12 @@ Rules: realistic volume for the experience level; compound lifts first; include 
       return json(row)
     }
 
-    // day / swap edit the latest plan in place.
+    // day / swap edit the latest plan in place — and only the plan the app is showing, so a
+    // stale screen (or another device) can't edit the wrong one.
     const plan = planRes.data
+    if (plan && typeof body.plan_id === 'string' && body.plan_id !== plan.id) {
+      throw new HttpError(409, 'Your plan changed on another device. Pull down to refresh and try again.')
+    }
     // deno-lint-ignore no-explicit-any
     const days: any[] = Array.isArray((plan?.plan_json as any)?.days) ? [...(plan!.plan_json as any).days] : []
     const dayIndex = Number(body.day_index)
@@ -184,7 +190,10 @@ Rules: realistic volume for the experience level; compound lifts first; include 
       )
       const parsed = parseModelJson(data.choices?.[0]?.message?.content)
       if (!parsed) throw new Error('Day regeneration returned no JSON')
-      days[dayIndex] = { ...cleanDay(parsed, day.day), day: day.day, rest: false }
+      // Force a training day: the model may return rest:true for the "recovery session" ask.
+      const fresh = cleanDay({ ...parsed, rest: false }, day.day)
+      if (fresh.exercises.length === 0) throw new Error('Day regeneration returned no exercises')
+      days[dayIndex] = { ...fresh, day: day.day }
     } else {
       const exerciseIndex = Number(body.exercise_index)
       const exercises = Array.isArray(day.exercises) ? [...day.exercises] : []

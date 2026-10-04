@@ -66,7 +66,9 @@ export function planTargets(stats: BodyStats, choice: GoalChoice): PlannedTarget
   let calories = tdee
   let limited = false
   if (choice.goal === 'lose') {
-    const minimum = Math.max(CALORIE_FLOOR[stats.sex], tdee * (1 - MAX_DEFICIT))
+    // Never below the floor or a 25% deficit — but never above maintenance either (for very
+    // small or older users maintenance itself can sit under the floor).
+    const minimum = Math.min(tdee, Math.max(CALORIE_FLOOR[stats.sex], tdee * (1 - MAX_DEFICIT)))
     calories = tdee - dailyDelta
     if (calories < minimum) {
       calories = minimum
@@ -105,4 +107,11 @@ export function suggestedTargetWeight(stats: BodyStats, goal: GoalType): number 
   if (goal === 'gain') return Math.round(w + 3)
   const healthyMax = 24.9 * Math.pow(stats.height_cm / 100, 2)
   return Math.round(Math.min(w - 1, Math.max(healthyMax, w * 0.9)))
+}
+
+// A target weight that contradicts the goal (e.g. "lose" to a heavier weight), or null.
+export function goalDirectionError(goal: GoalType, currentKg: number, targetKg: number): string | null {
+  if (goal === 'lose' && targetKg >= currentKg) return `To lose fat, set a target below your current ${currentKg} kg.`
+  if (goal === 'gain' && targetKg <= currentKg) return `To build muscle, set a target above your current ${currentKg} kg.`
+  return null
 }

@@ -5,7 +5,7 @@ import { Dumbbell, Equal, Scale, SlidersHorizontal, TrendingDown } from 'lucide-
 import type { LucideIcon } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
-import { GoalType, Pace, PACE_KG_PER_WEEK, planTargets, suggestedTargetWeight } from '../../lib/utils/goalPlanner'
+import { GoalType, Pace, PACE_KG_PER_WEEK, goalDirectionError, planTargets, suggestedTargetWeight } from '../../lib/utils/goalPlanner'
 import { useThemeColors } from '../../lib/theme'
 import { Screen, Heading, Text, Input, Button, Chip } from '../../components/ui'
 import { CountUp, FadeIn, PressableScale } from '../../components/motion'
@@ -97,6 +97,10 @@ export default function OnboardingGoalsScreen() {
       setFormError('Enter a target weight between 25 and 350 kg.')
       return
     }
+    if (directionError) {
+      setFormError(directionError)
+      return
+    }
     const values = custom
       ? {
           daily_calorie_target: parseInt(calories, 10),
@@ -135,8 +139,9 @@ export default function OnboardingGoalsScreen() {
     else router.replace('/(tabs)')
   }
 
+  const directionError = profile && Number.isFinite(target) ? goalDirectionError(goal, current, target) : null
   const eta =
-    plan && plan.weeksToTarget > 0
+    plan && !directionError && plan.weeksToTarget > 0
       ? new Date(Date.now() + plan.weeksToTarget * 7 * 24 * 3600 * 1000).toLocaleDateString([], { month: 'short', year: 'numeric' })
       : null
   const delta = plan ? plan.calories - plan.maintenanceCalories : 0
@@ -186,6 +191,9 @@ export default function OnboardingGoalsScreen() {
       </View>
 
       <Input label="Target weight (kg)" icon={Scale} keyboardType="decimal-pad" value={targetWeight} onChangeText={setTargetWeight} containerClassName="mb-4" />
+      {directionError ? (
+        <Text variant="caption" className="text-warning -mt-2 mb-4">{directionError}</Text>
+      ) : null}
 
       {goal !== 'maintain' ? (
         <View className="mb-5">

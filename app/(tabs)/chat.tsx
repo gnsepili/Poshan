@@ -51,8 +51,9 @@ export default function ChatScreen() {
             {conversationId ? threadTitle ?? 'Your AI health coach' : 'New chat'}
           </Text>
         </View>
-        <IconButton icon={History} accessibilityLabel="Chat history" variant="ghost" onPress={() => router.push('/coach/threads')} />
-        <IconButton icon={SquarePen} accessibilityLabel="New chat" variant="ghost" onPress={startNewConversation} />
+        {/* Disabled while a reply is on its way, so it can't land in a different thread. */}
+        <IconButton icon={History} accessibilityLabel="Chat history" variant="ghost" disabled={loading} onPress={() => router.push('/coach/threads')} />
+        <IconButton icon={SquarePen} accessibilityLabel="New chat" variant="ghost" disabled={loading} onPress={startNewConversation} />
       </View>
 
       {messages.length === 0 ? (

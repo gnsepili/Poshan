@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/database.types'
-import { Profile, Goal } from '../types'
+import { Profile, Goal, WorkoutPrefs } from '../types'
 
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
 type GoalInsert = Database['public']['Tables']['goals']['Insert']
@@ -19,6 +19,8 @@ interface ProfileState {
   fetchGoals: (userId: string) => Promise<boolean>
   upsertProfile: (profile: Partial<Profile> & { id: string }) => Promise<void>
   upsertGoals: (goals: Partial<Goal> & { user_id: string }) => Promise<void>
+  /** UPDATE (not upsert): an upsert's insert path trips the profile's NOT NULL columns. */
+  saveWorkoutPrefs: (userId: string, prefs: WorkoutPrefs) => Promise<boolean>
 }
 
 export const useProfileStore = create<ProfileState>()(
@@ -78,6 +80,22 @@ export const useProfileStore = create<ProfileState>()(
         if (!error) s.profile = data as Profile
         s.error = error?.message ?? null
       })
+    },
+
+    saveWorkoutPrefs: async (userId, prefs) => {
+      set((s) => { s.loading = true; s.error = null })
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ workout_prefs: prefs as unknown as Database['public']['Tables']['profiles']['Update']['workout_prefs'] })
+        .eq('id', userId)
+        .select()
+        .single()
+      set((s) => {
+        s.loading = false
+        if (!error && data) s.profile = data as unknown as Profile
+        s.error = error?.message ?? null
+      })
+      return !error
     },
 
     upsertGoals: async (goals) => {
