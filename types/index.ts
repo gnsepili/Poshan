@@ -15,8 +15,24 @@ export interface Profile {
   health_conditions: string
   treatment_duration_months: number
   ai_provider: AiProvider
+  workout_prefs: WorkoutPrefs | null
   created_at: string
   updated_at: string
+}
+
+export type WorkoutEquipment = 'gym' | 'home_dumbbells' | 'bodyweight'
+export type WorkoutFocus = 'fat_loss' | 'muscle' | 'strength' | 'general' | 'endurance'
+export type WorkoutExperience = 'beginner' | 'intermediate' | 'advanced'
+
+/** Training preferences that drive workout plan generation. */
+export interface WorkoutPrefs {
+  days_per_week: number
+  session_minutes: number
+  equipment: WorkoutEquipment
+  focus: WorkoutFocus
+  experience: WorkoutExperience
+  /** Injuries or limitations to avoid, free text. */
+  limitations: string
 }
 
 export interface Goal {
@@ -231,12 +247,16 @@ export interface WorkoutExercise {
   sets: number
   reps: string
   notes: string
+  rest_seconds?: number
 }
 
 export interface WorkoutPlanDay {
   day: string
   focus: string
   exercises: WorkoutExercise[]
+  /** Set by plans generated with preferences (older plans omit them). */
+  rest?: boolean
+  duration_min?: number
 }
 
 export interface WorkoutPlanJson {

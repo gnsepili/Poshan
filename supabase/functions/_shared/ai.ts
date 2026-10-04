@@ -1,7 +1,7 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // Which model each feature uses is a backend flag (app_config row 'ai'), not a user setting.
-export type AiFeature = 'chat' | 'meal_analysis' | 'inbody_analysis' | 'daily_summary'
+export type AiFeature = 'chat' | 'meal_analysis' | 'inbody_analysis' | 'daily_summary' | 'workout_plan'
 
 interface AiConfig {
   provider: string

@@ -474,6 +474,7 @@ export type Database = {
           sex: string
           treatment_duration_months: number
           updated_at: string
+          workout_prefs: Json | null
         }
         Insert: {
           activity_level: string
@@ -488,6 +489,7 @@ export type Database = {
           sex: string
           treatment_duration_months?: number
           updated_at?: string
+          workout_prefs?: Json | null
         }
         Update: {
           activity_level?: string
@@ -502,6 +504,7 @@ export type Database = {
           sex?: string
           treatment_duration_months?: number
           updated_at?: string
+          workout_prefs?: Json | null
         }
         Relationships: []
       }

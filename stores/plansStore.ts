@@ -5,6 +5,7 @@ import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { logEvent } from '../lib/telemetry'
 import { sendAgentMessage } from '../lib/api/agent'
+import { buildWorkoutWeek, regenerateWorkoutDay as apiRegenerateDay, swapWorkoutExercise as apiSwapExercise } from '../lib/api/workoutPlan'
 import { MealPlan, MealPlanJson, WorkoutPlan, WorkoutPlanJson } from '../types'
 
 interface PlansState {
@@ -12,19 +13,39 @@ interface PlansState {
   workoutPlan: WorkoutPlan | null
   loading: boolean
   generating: boolean
+  /** Which workout edit is in flight: 'week' | 'day:<i>' | 'swap:<day>:<exercise>'. */
+  workoutBusy: string | null
   error: string | null
   fetchPlans: (userId: string) => Promise<void>
   generateMealPlan: (userId: string) => Promise<void>
   generateWorkoutPlan: (userId: string) => Promise<void>
+  regenerateWorkoutDay: (dayIndex: number) => Promise<void>
+  swapWorkoutExercise: (dayIndex: number, exerciseIndex: number) => Promise<void>
 }
 
 export const usePlansStore = create<PlansState>()(
   persist(
-  immer((set, get) => ({
+  immer((set, get) => {
+  // Workout edits go through the ai-workout-plan function, which returns the saved plan.
+  const runWorkoutEdit = async (busy: string, request: () => Promise<WorkoutPlan>): Promise<void> => {
+    set((s) => { s.workoutBusy = busy; s.error = null })
+    try {
+      const plan = await request()
+      set((s) => {
+        s.workoutPlan = { ...plan, plan_json: plan.plan_json as object as WorkoutPlanJson }
+      })
+    } catch (e) {
+      set((s) => { s.error = e instanceof Error ? e.message : String(e) })
+    } finally {
+      set((s) => { s.workoutBusy = null })
+    }
+  }
+  return {
     mealPlan: null,
     workoutPlan: null,
     loading: false,
     generating: false,
+    workoutBusy: null,
     error: null,
 
     fetchPlans: async (userId) => {
@@ -70,21 +91,16 @@ export const usePlansStore = create<PlansState>()(
     },
 
     generateWorkoutPlan: async (userId) => {
-      set((s) => { s.generating = true; s.error = null })
-      try {
-        await sendAgentMessage('Generate a new weekly workout plan based on my goals, activity level, and latest InBody data, and save it with the generate_workout_plan tool.')
-      } catch (e) {
-        set((s) => { s.generating = false; s.error = e instanceof Error ? e.message : String(e) })
-        return
-      }
-      set((s) => { s.generating = false })
-      await get().fetchPlans(userId)
+      await runWorkoutEdit('week', buildWorkoutWeek)
       logEvent('plan_generated', { kind: 'workout' }, userId)
-      if (!get().workoutPlan) {
-        set((s) => { s.error = s.error ?? 'The coach could not generate a workout plan right now. Please try again.' })
-      }
     },
-  })),
+
+    regenerateWorkoutDay: (dayIndex) => runWorkoutEdit(`day:${dayIndex}`, () => apiRegenerateDay(dayIndex)),
+
+    swapWorkoutExercise: (dayIndex, exerciseIndex) =>
+      runWorkoutEdit(`swap:${dayIndex}:${exerciseIndex}`, () => apiSwapExercise(dayIndex, exerciseIndex)),
+  }
+  }),
   cacheOptions<PlansState>('plans', ['mealPlan', 'workoutPlan'])
   )
 )

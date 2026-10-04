@@ -17,7 +17,7 @@ export async function resetAllStores(): Promise<void> {
   useMealsStore.setState({ meals: [], mealsDay: null, loading: false, error: null, pendingCount: 0, flushing: false })
   useActivityStore.setState({ todayActivity: [], activityDay: null, loading: false, error: null })
   useDailySummaryStore.setState({ summary: null, summaryDay: null, recent: [], loading: false, loaded: false, error: null })
-  usePlansStore.setState({ mealPlan: null, workoutPlan: null, loading: false, generating: false, error: null })
+  usePlansStore.setState({ mealPlan: null, workoutPlan: null, loading: false, generating: false, workoutBusy: null, error: null })
   useProfileStore.setState({ profile: null, goals: null, loading: false, error: null })
   useInbodyStore.setState({ reports: [], latest: null, loading: false, error: null })
   useChatStore.setState({ messages: [], conversationId: null, conversations: [], loading: false, error: null })

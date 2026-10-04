@@ -167,6 +167,7 @@ export default function RootLayout() {
             <Stack.Screen name="meal/new" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="meal/[id]" />
             <Stack.Screen name="coach/threads" />
+            <Stack.Screen name="plans/preferences" />
           </Stack>
           </KeyboardProvider>
         </SafeAreaProvider>
