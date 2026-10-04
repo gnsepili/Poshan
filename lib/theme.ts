@@ -36,6 +36,9 @@ const palette = {
   macroFatSoft: '#241C3D',
   macroSteps: '#F472B6',
   macroStepsSoft: '#3A1428',
+  // Winter Arc challenge accent (frost blue).
+  arc: '#7DD3FC',
+  arcSoft: '#0C2A3A',
 }
 
 export type ThemeColors = typeof palette

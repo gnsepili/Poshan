@@ -20,6 +20,8 @@ import { Screen, Heading, Text, EmptyState } from '../../components/ui'
 import { FadeIn, PressableScale } from '../../components/motion'
 import { TodayRings } from '../../components/home/TodayRings'
 import { MacroTile } from '../../components/home/MacroTile'
+import { ArcCard } from '../../components/challenge/ArcCard'
+import { useChallengeStore } from '../../stores/challengeStore'
 import { useThemeColors } from '../../lib/theme'
 import { sumMeals } from '../../lib/utils/macros'
 import { sumSteps } from '../../lib/utils/activity'
@@ -58,6 +60,7 @@ export default function HomeScreen() {
             fetchOrCreateToday(user.id),
             fetchTodayActivity(user.id),
             hcAvailable && hcGranted ? syncNow(user.id) : undefined,
+            useChallengeStore.getState().fetchActive(user.id),
           ])
         : undefined,
     { enabled: !!user }
@@ -130,6 +133,10 @@ export default function HomeScreen() {
         <MacroTile label="Protein" value={totals.protein} target={proteinTarget} color={colors.macroProtein} trackColor={colors.macroProteinSoft} />
         <MacroTile label="Carbs" value={totals.carbs} target={carbsTarget} color={colors.macroCarbs} trackColor={colors.macroCarbsSoft} />
         <MacroTile label="Fat" value={totals.fat} target={fatTarget} color={colors.macroFat} trackColor={colors.macroFatSoft} />
+      </FadeIn>
+
+      <FadeIn index={3} className="mb-3">
+        <ArcCard />
       </FadeIn>
 
       {summary?.ai_coach_note ? (

@@ -9,6 +9,26 @@ function describeInbody(scan: any): string {
   return extraction_version >= 2 ? JSON.stringify({ ...metrics, full_sheet: raw_extracted_json }) : JSON.stringify(metrics)
 }
 
+// The user's active challenge (e.g. Winter Arc): rules and today's status, so the coach can
+// push them on what's still open today. Best-effort — never blocks the reply.
+async function describeArc(userId: string, supabase: SupabaseClient, today: string): Promise<string> {
+  try {
+    const { data: c } = await supabase
+      .from('challenges')
+      .select('id, title, start_date, end_date, rules, strict')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!c) return ''
+    const { data: rows } = await supabase.rpc('challenge_progress', { p_challenge_id: c.id })
+    const todayRows = ((rows ?? []) as { day: string; rule_id: string; done: boolean }[]).filter((r) => r.day === today)
+    const dayNumber = Math.round((Date.parse(today) - Date.parse(c.start_date)) / 86400000) + 1
+    return `Active challenge: ${c.title} (${c.strict ? 'strict' : 'streak'} mode), day ${dayNumber}, ${c.start_date} to ${c.end_date}. Today's rules: ${JSON.stringify(todayRows.map((r) => ({ rule: r.rule_id, done: r.done })))}. Encourage them on the rules still open today.`
+  } catch {
+    return ''
+  }
+}
+
 export async function assembleContext(userId: string, supabase: SupabaseClient): Promise<string> {
   const today = new Date().toISOString().split('T')[0]
 
@@ -22,6 +42,8 @@ export async function assembleContext(userId: string, supabase: SupabaseClient):
     supabase.from('meal_plans').select('week_start_date').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('workout_plans').select('week_start_date').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
+
+  const arc = await describeArc(userId, supabase, today)
 
   const todayCalories = (mealsRes.data ?? []).reduce((sum: number, m: { total_calories: number }) => sum + m.total_calories, 0)
 
@@ -37,5 +59,6 @@ Recent activity (today): ${JSON.stringify(activityRes.data)}
 Last 7 days summaries: ${JSON.stringify(historyRes.data)}
 Latest meal plan week: ${JSON.stringify(mealPlanRes.data)}
 Latest workout plan week: ${JSON.stringify(workoutPlanRes.data)}
+${arc}
 `.trim()
 }

@@ -89,6 +89,86 @@ export type Database = {
         }
         Relationships: []
       }
+      challenge_checkins: {
+        Row: {
+          challenge_id: string
+          date: string
+          done: boolean
+          rule_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          date: string
+          done?: boolean
+          rule_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          date?: string
+          done?: boolean
+          rule_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_checkins_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          kind: string
+          rules: string[]
+          start_body_fat_pct: number | null
+          start_date: string
+          start_weight_kg: number | null
+          status: string
+          strict: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          kind?: string
+          rules: string[]
+          start_body_fat_pct?: number | null
+          start_date: string
+          start_weight_kg?: number | null
+          status?: string
+          strict?: boolean
+          title?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          kind?: string
+          rules?: string[]
+          start_body_fat_pct?: number | null
+          start_date?: string
+          start_weight_kg?: number | null
+          status?: string
+          strict?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
@@ -561,6 +641,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      challenge_progress: {
+        Args: { p_challenge_id: string }
+        Returns: {
+          day: string
+          done: boolean
+          rule_id: string
+          target: number
+          value: number
+        }[]
+      }
       check_and_increment_ai_usage: {
         Args: { p_cap: number; p_user_id: string }
         Returns: boolean

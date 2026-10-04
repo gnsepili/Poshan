@@ -6,10 +6,13 @@ import { useChatStore } from '../../stores/chatStore'
 import PlansScreen from '../(tabs)/plans'
 import GoalsScreen from '../(onboarding)/goals'
 import ThreadsScreen from '../coach/threads'
+import ChallengeScreen from '../challenge'
+import { useChallengeStore } from '../../stores/challengeStore'
+import { todayKey } from '../../lib/cache'
 import { Profile, WorkoutPlan } from '../../types'
 
 // Development-only: renders a real screen with sample store data so it can be checked on
-// web without signing in. /screen-preview?screen=plans|goals|threads. Release builds redirect.
+// web without signing in. /screen-preview?screen=plans|goals|threads|arc|arc-join. Release builds redirect.
 const profile = {
   id: 'preview',
   age: 28,
@@ -50,11 +53,32 @@ export default function ScreenPreview() {
         { id: 'c2', title: 'Swap ideas for my dinner', updated_at: new Date(Date.now() - 3 * 86400000).toISOString() },
       ],
     })
+    const today = todayKey()
+    const day = (offset: number) => new Date(Date.parse(`${today}T00:00:00Z`) - offset * 86400000).toISOString().split('T')[0]
+    const rules = ['workout', 'steps', 'protein', 'no_junk', 'water', 'sleep']
+    const rows = [3, 2, 1, 0].flatMap((o) =>
+      rules.map((r, i) => ({
+        day: day(o),
+        rule_id: r,
+        done: o === 0 ? i % 2 === 0 : o === 2 ? i !== 3 : true,
+        value: r === 'protein' ? (o === 0 ? 86 : 150) : r === 'steps' ? 9200 : null,
+        target: r === 'protein' ? 150 : r === 'steps' ? 8000 : null,
+      }))
+    )
+    useChallengeStore.setState(
+      screen === 'arc-join'
+        ? { challenge: null, rows: [] }
+        : {
+            challenge: { id: 'arc', user_id: 'preview', kind: 'winter_arc', title: 'Winter Arc 2026', start_date: day(3), end_date: '2026-12-31', rules, strict: false, status: 'active', start_weight_kg: 94.2, start_body_fat_pct: 32.1, created_at: '' },
+            rows,
+          }
+    )
     setSeeded(true)
   }, [])
   if (!__DEV__) return <Redirect href="/(auth)/login" />
   if (!seeded) return null
   if (screen === 'goals') return <GoalsScreen />
   if (screen === 'threads') return <ThreadsScreen />
+  if (screen === 'arc' || screen === 'arc-join') return <ChallengeScreen />
   return <PlansScreen />
 }

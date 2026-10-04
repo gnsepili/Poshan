@@ -8,6 +8,7 @@ import { useInbodyStore } from '../stores/inbodyStore'
 import { useChatStore } from '../stores/chatStore'
 import { usePushStore } from '../stores/pushStore'
 import { useHealthConnectStore } from '../stores/healthConnectStore'
+import { useChallengeStore } from '../stores/challengeStore'
 import { clearSignedPhotoCache } from './signedPhotos'
 
 // Wipe every per-user data store on sign-out so a second user on the same device
@@ -21,6 +22,7 @@ export async function resetAllStores(): Promise<void> {
   useProfileStore.setState({ profile: null, goals: null, loading: false, error: null })
   useInbodyStore.setState({ reports: [], latest: null, loading: false, error: null })
   useChatStore.setState({ messages: [], conversationId: null, conversations: [], loading: false, error: null })
+  useChallengeStore.setState({ challenge: null, rows: [], loading: false, error: null })
   usePushStore.setState({ token: null, permissionGranted: false, registering: false, error: null })
   useHealthConnectStore.setState({
     available: null,

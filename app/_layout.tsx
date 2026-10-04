@@ -28,6 +28,7 @@ import { useDailySummaryStore } from '../stores/dailySummaryStore'
 import { useInbodyStore } from '../stores/inbodyStore'
 import { usePlansStore } from '../stores/plansStore'
 import { useChatStore } from '../stores/chatStore'
+import { useChallengeStore } from '../stores/challengeStore'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { logError } from '../lib/telemetry'
 import { installGlobalErrorHandler } from '../lib/globalErrorHandler'
@@ -59,7 +60,7 @@ export default function RootLayout() {
   // Cached data must be loaded before anything fetches fresh data over it.
   useEffect(() => {
     whenHydrated(
-      [useMealsStore, useProfileStore, useActivityStore, useDailySummaryStore, useInbodyStore, usePlansStore, useChatStore],
+      [useMealsStore, useProfileStore, useActivityStore, useDailySummaryStore, useInbodyStore, usePlansStore, useChatStore, useChallengeStore],
       2000
     ).then(() => setCacheReady(true))
   }, [])
@@ -168,6 +169,7 @@ export default function RootLayout() {
             <Stack.Screen name="meal/[id]" />
             <Stack.Screen name="coach/threads" />
             <Stack.Screen name="plans/preferences" />
+            <Stack.Screen name="challenge/index" />
           </Stack>
           </KeyboardProvider>
         </SafeAreaProvider>
