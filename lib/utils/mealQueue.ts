@@ -15,6 +15,7 @@ export interface QueuedMeal {
   // photo_local_uri cleared — so a crash between upload and insert-removal never re-uploads
   // on the next flush; it reuses this already-uploaded remote URL instead.
   photo_url?: string
+  ai_suggestions?: string | null
   queued_at: string
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Calendar, Ruler, Weight as WeightIcon } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
@@ -23,49 +23,69 @@ const SEX_LABELS: Record<'male' | 'female' | 'other', string> = {
   other: 'Other',
 }
 
+// Inclusive sanity bounds — catches typos (e.g. 1750 cm) before they reach the coach.
+function inRange(value: number, min: number, max: number): boolean {
+  return Number.isFinite(value) && value >= min && value <= max
+}
+
 export default function OnboardingProfileScreen() {
   const router = useRouter()
+  // Settings opens this screen with ?mode=edit to change an existing profile.
+  const editing = useLocalSearchParams<{ mode?: string }>().mode === 'edit'
   const { user } = useAuthStore()
-  const { upsertProfile, loading, error } = useProfileStore()
-  const [age, setAge] = useState('')
-  const [sex, setSex] = useState<'male' | 'female' | 'other'>('male')
-  const [heightCm, setHeightCm] = useState('')
-  const [weightKg, setWeightKg] = useState('')
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderate')
+  const { profile, upsertProfile, loading, error } = useProfileStore()
+  const [age, setAge] = useState(profile?.age ? String(profile.age) : '')
+  const [sex, setSex] = useState<'male' | 'female' | 'other'>(profile?.sex ?? 'male')
+  const [heightCm, setHeightCm] = useState(profile?.height_cm ? String(profile.height_cm) : '')
+  const [weightKg, setWeightKg] = useState(profile?.current_weight_kg ? String(profile.current_weight_kg) : '')
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile?.activity_level ?? 'moderate')
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const handleNext = async () => {
+  const handleSave = async () => {
     if (!user) return
-    await upsertProfile({
-      id: user.id,
+    const parsed = {
       age: parseInt(age, 10),
-      sex,
       height_cm: parseFloat(heightCm),
       current_weight_kg: parseFloat(weightKg),
-      activity_level: activityLevel,
-    })
-    if (useProfileStore.getState().error === null) {
-      router.push('/(onboarding)/goals')
     }
+    if (!inRange(parsed.age, 13, 110) || !inRange(parsed.height_cm, 90, 250) || !inRange(parsed.current_weight_kg, 25, 350)) {
+      setFormError('Please enter a valid age (13-110), height in cm (90-250) and weight in kg (25-350).')
+      return
+    }
+    setFormError(null)
+    await upsertProfile({ id: user.id, ...parsed, sex, activity_level: activityLevel })
+    if (useProfileStore.getState().error !== null) return
+    if (editing) router.back()
+    else router.push('/(onboarding)/goals')
   }
 
-  return (
-    <Screen scroll footer={<Button label="Next: Set goals" loading={loading} onPress={handleNext} />}>
-      <View className="mt-1 mb-6">
-        <Text variant="caption" muted className="uppercase tracking-wide">
-          Step 1 of 3
-        </Text>
-        <Heading level={1} uppercase>
-          Your health profile
-        </Heading>
-        <Text variant="body" muted className="mt-1">
-          Tell us a bit about yourself so we can personalize your plan.
-        </Text>
-      </View>
+  const shownError = formError ?? error
 
-      {error ? (
+  return (
+    <Screen
+      scroll
+      back={editing}
+      title={editing ? 'Health profile' : undefined}
+      footer={<Button label={editing ? 'Save changes' : 'Next: Set goals'} loading={loading} onPress={handleSave} />}
+    >
+      {editing ? null : (
+        <View className="mt-1 mb-6">
+          <Text variant="caption" muted className="uppercase tracking-wide">
+            Step 1 of 2
+          </Text>
+          <Heading level={1} uppercase>
+            Your health profile
+          </Heading>
+          <Text variant="body" muted className="mt-1">
+            Tell us a bit about yourself so we can personalize your plan.
+          </Text>
+        </View>
+      )}
+
+      {shownError ? (
         <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
           <Text variant="bodySm" className="text-danger">
-            {error}
+            {shownError}
           </Text>
         </View>
       ) : null}

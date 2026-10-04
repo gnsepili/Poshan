@@ -9,6 +9,8 @@ jest.mock('../../lib/supabase', () => ({
   supabase: {
     auth: {
       signInWithPassword: jest.fn(),
+      signInWithOAuth: jest.fn(),
+      exchangeCodeForSession: jest.fn(),
       signUp: jest.fn(),
       signOut: jest.fn(),
       getSession: jest.fn(),
@@ -45,6 +47,11 @@ jest.mock('expo-notifications', () => ({
 }))
 jest.mock('expo-constants', () => ({ default: { expoConfig: { extra: { eas: { projectId: 'proj-1' } } } } }))
 jest.mock('../../lib/api/agent', () => ({ sendAgentMessage: jest.fn() }))
+jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn(), maybeCompleteAuthSession: jest.fn() }))
+jest.mock('expo-linking', () => ({ createURL: jest.fn(() => 'poshanai://auth-callback') }))
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid' }))
+
+import * as WebBrowser from 'expo-web-browser'
 
 describe('authStore', () => {
   beforeEach(() => useAuthStore.setState({ session: null, user: null, loading: false, error: null }))
@@ -124,5 +131,72 @@ describe('authStore', () => {
     })
     await useAuthStore.getState().initialize()
     expect(useAuthStore.getState().error).toBeNull()
+  })
+
+  it('wipes per-user stores when the session ends on its own (expiry/revocation SIGNED_OUT)', async () => {
+    ;(supabase.auth.getSession as jest.Mock).mockResolvedValue({ data: { session: { user: { id: 'u1' } } }, error: null })
+    let listener: ((event: string, session: unknown) => void) | undefined
+    ;(supabase.auth.onAuthStateChange as jest.Mock).mockImplementation((cb) => {
+      listener = cb
+      return { data: { subscription: { unsubscribe: jest.fn() } } }
+    })
+    useProfileStore.setState({ profile: { id: 'u1' } as never, goals: { id: 'g1' } as never })
+
+    await useAuthStore.getState().initialize()
+    listener!('SIGNED_OUT', null)
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(useAuthStore.getState().session).toBeNull()
+    expect(useProfileStore.getState().profile).toBeNull()
+    expect(useProfileStore.getState().goals).toBeNull()
+  })
+
+  describe('signInWithGoogle', () => {
+    beforeEach(() => {
+      ;(supabase.auth.exchangeCodeForSession as jest.Mock).mockReset()
+      ;(supabase.auth.signInWithOAuth as jest.Mock).mockResolvedValue({ data: { url: 'https://auth.example/authorize' }, error: null })
+    })
+
+    it('opens Google in an auth session and exchanges the returned code for a session', async () => {
+      ;(WebBrowser.openAuthSessionAsync as jest.Mock).mockResolvedValue({ type: 'success', url: 'poshanai://auth-callback?code=c1' })
+      const session = { user: { id: 'u1' } }
+      ;(supabase.auth.exchangeCodeForSession as jest.Mock).mockResolvedValue({ data: { session }, error: null })
+
+      await useAuthStore.getState().signInWithGoogle()
+
+      expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
+        provider: 'google',
+        options: { redirectTo: 'poshanai://auth-callback', skipBrowserRedirect: true },
+      })
+      expect(WebBrowser.openAuthSessionAsync).toHaveBeenCalledWith('https://auth.example/authorize', 'poshanai://auth-callback')
+      expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('c1')
+      expect(useAuthStore.getState().session).toBe(session)
+      expect(useAuthStore.getState().loading).toBe(false)
+      expect(useAuthStore.getState().error).toBeNull()
+    })
+
+    it('treats a dismissed browser as a quiet cancel (no error)', async () => {
+      ;(WebBrowser.openAuthSessionAsync as jest.Mock).mockResolvedValue({ type: 'cancel' })
+      await useAuthStore.getState().signInWithGoogle()
+      expect(supabase.auth.exchangeCodeForSession).not.toHaveBeenCalled()
+      expect(useAuthStore.getState().error).toBeNull()
+      expect(useAuthStore.getState().loading).toBe(false)
+    })
+
+    it('shows the provider error when Google sign-in fails', async () => {
+      ;(WebBrowser.openAuthSessionAsync as jest.Mock).mockResolvedValue({
+        type: 'success',
+        url: 'poshanai://auth-callback?error=access_denied&error_description=Provider%20is%20not%20enabled',
+      })
+      await useAuthStore.getState().signInWithGoogle()
+      expect(useAuthStore.getState().error).toBe('Provider is not enabled')
+      expect(useAuthStore.getState().loading).toBe(false)
+    })
+
+    it('shows an error when the OAuth URL cannot be created', async () => {
+      ;(supabase.auth.signInWithOAuth as jest.Mock).mockResolvedValue({ data: { url: null }, error: { message: 'Unsupported provider' } })
+      await useAuthStore.getState().signInWithGoogle()
+      expect(useAuthStore.getState().error).toBe('Unsupported provider')
+    })
   })
 })

@@ -71,6 +71,24 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
@@ -248,44 +266,77 @@ export type Database = {
       inbody_reports: {
         Row: {
           ai_notes: string | null
+          bmi: number | null
           bmr: number | null
+          body_fat_mass_kg: number | null
           body_fat_pct: number | null
           created_at: string
+          ecw_tbw_ratio: number | null
+          extraction_version: number
+          fat_free_mass_kg: number | null
           id: string
+          inbody_score: number | null
           muscle_mass_kg: number | null
+          phase_angle: number | null
           photo_url: string | null
           raw_extracted_json: Json | null
           scanned_at: string
+          smi: number | null
+          target_weight_kg: number | null
+          total_body_water_l: number | null
           user_id: string
           visceral_fat: number | null
+          waist_hip_ratio: number | null
           weight_kg: number | null
         }
         Insert: {
           ai_notes?: string | null
+          bmi?: number | null
           bmr?: number | null
+          body_fat_mass_kg?: number | null
           body_fat_pct?: number | null
           created_at?: string
+          ecw_tbw_ratio?: number | null
+          extraction_version?: number
+          fat_free_mass_kg?: number | null
           id?: string
+          inbody_score?: number | null
           muscle_mass_kg?: number | null
+          phase_angle?: number | null
           photo_url?: string | null
           raw_extracted_json?: Json | null
           scanned_at?: string
+          smi?: number | null
+          target_weight_kg?: number | null
+          total_body_water_l?: number | null
           user_id: string
           visceral_fat?: number | null
+          waist_hip_ratio?: number | null
           weight_kg?: number | null
         }
         Update: {
           ai_notes?: string | null
+          bmi?: number | null
           bmr?: number | null
+          body_fat_mass_kg?: number | null
           body_fat_pct?: number | null
           created_at?: string
+          ecw_tbw_ratio?: number | null
+          extraction_version?: number
+          fat_free_mass_kg?: number | null
           id?: string
+          inbody_score?: number | null
           muscle_mass_kg?: number | null
+          phase_angle?: number | null
           photo_url?: string | null
           raw_extracted_json?: Json | null
           scanned_at?: string
+          smi?: number | null
+          target_weight_kg?: number | null
+          total_body_water_l?: number | null
           user_id?: string
           visceral_fat?: number | null
+          waist_hip_ratio?: number | null
           weight_kg?: number | null
         }
         Relationships: []
@@ -460,7 +511,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_and_increment_ai_usage: {
+        Args: { p_cap: number; p_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

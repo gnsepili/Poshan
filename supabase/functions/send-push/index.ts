@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
     const messages: { to: string; title: string; body: string; data?: Record<string, unknown> }[] = []
     const tokenToUser = new Map<string, string>()
     for (const n of notifications) {
-      const { data: tokens } = await supabase.from('push_tokens').select('token').eq('user_id', n.user_id)
+      const { data: tokens, error: tokenErr } = await supabase.from('push_tokens').select('token').eq('user_id', n.user_id)
+      if (tokenErr) await logEdgeError(supabase, 'send-push:tokens', new Error(tokenErr.message), n.user_id)
       for (const t of ((tokens ?? []) as { token: string }[])) {
         tokenToUser.set(t.token, n.user_id)
         messages.push({ to: t.token, title: n.title, body: n.body, data: n.data })
@@ -56,7 +57,10 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(chunk),
       })
-      if (!res.ok) continue
+      if (!res.ok) {
+        await logEdgeError(supabase, 'send-push:expo', new Error(`Expo push ${res.status}: ${(await res.text()).slice(0, 300)}`))
+        continue
+      }
       const json = await res.json()
       const tickets = (json.data ?? []) as { status: string; details?: { error?: string } }[]
       tickets.forEach((ticket, idx) => {
@@ -76,6 +80,6 @@ Deno.serve(async (req) => {
     } catch (_ignore) {
       /* logging is best-effort */
     }
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'Push send failed.' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
   }
 })

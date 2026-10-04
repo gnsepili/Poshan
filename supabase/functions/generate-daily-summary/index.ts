@@ -1,16 +1,10 @@
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { chatCompletion, parseModelJson } from '../_shared/ai.ts'
 import { logEdgeError } from '../_shared/logError.ts'
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+import { CORS, enforceAiQuota, errorResponse, json, requireUserId, serviceClient } from '../_shared/http.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
 const SEND_PUSH_URL = `${SUPABASE_URL}/functions/v1/send-push`
 
@@ -47,7 +41,7 @@ async function generateForUser(userId: string, supabase: SupabaseClient): Promis
   )
   const ySteps = ((yActivityRes.data ?? []) as { steps: number }[]).reduce((a, x) => a + x.steps, 0)
   // Upsert ONLY the totals columns so an existing ai_coach_note on yesterday is preserved.
-  await supabase.from('daily_summaries').upsert(
+  const { error: rollupErr } = await supabase.from('daily_summaries').upsert(
     {
       user_id: userId,
       date: yesterday,
@@ -59,13 +53,14 @@ async function generateForUser(userId: string, supabase: SupabaseClient): Promis
     },
     { onConflict: 'user_id,date' }
   )
+  if (rollupErr) throw new Error(`yesterday rollup failed: ${rollupErr.message}`)
 
   // 2. Read recent trend, latest goals, latest InBody.
   const [trendRes, goalsRes, inbodyRes] = await Promise.all([
     supabase.from('daily_summaries').select('date, total_calories_consumed, total_protein_g, total_steps')
       .eq('user_id', userId).order('date', { ascending: false }).limit(7),
     supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('inbody_reports').select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg')
+    supabase.from('inbody_reports').select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, body_fat_mass_kg, visceral_fat, ecw_tbw_ratio, inbody_score, target_weight_kg')
       .eq('user_id', userId).order('scanned_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
@@ -85,28 +80,21 @@ Respond with ONLY a JSON object, no markdown, with exactly:
 }
 If there are no goals yet, base the targets on sensible maintenance defaults and say so briefly in the note.`
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: prompt }],
-    }),
+  const data = await chatCompletion(supabase, 'daily_summary', {
+    max_completion_tokens: 500,
+    response_format: { type: 'json_object' },
+    messages: [{ role: 'user', content: prompt }],
   })
-  if (!res.ok) throw new Error(`OpenAI error ${res.status}: ${await res.text()}`)
-  const data = await res.json()
-  let parsed: { ai_daily_goals?: unknown; ai_coach_note?: unknown } = {}
-  try { parsed = JSON.parse(data.choices[0].message.content ?? '{}') } catch { parsed = {} }
+  const parsed = (parseModelJson(data.choices?.[0]?.message?.content) ?? {}) as { ai_daily_goals?: unknown; ai_coach_note?: unknown }
   const aiDailyGoals = (parsed.ai_daily_goals && typeof parsed.ai_daily_goals === 'object') ? parsed.ai_daily_goals : null
   const aiCoachNote = typeof parsed.ai_coach_note === 'string' ? parsed.ai_coach_note : ''
 
   // 4. Upsert ONLY the AI columns onto today's row (preserves today's meal totals).
-  await supabase.from('daily_summaries').upsert(
+  const { error: aiWriteErr } = await supabase.from('daily_summaries').upsert(
     { user_id: userId, date: today, ai_daily_goals: aiDailyGoals, ai_coach_note: aiCoachNote },
     { onConflict: 'user_id,date' }
   )
+  if (aiWriteErr) throw new Error(`today's coach note write failed: ${aiWriteErr.message}`)
 
   const { data: todayRow } = await supabase.from('daily_summaries')
     .select('*').eq('user_id', userId).eq('date', today).maybeSingle()
@@ -116,11 +104,12 @@ If there are no goals yet, base the targets on sensible maintenance defaults and
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
 
+  let userId: string | null = null
   try {
     const cronSecret = req.headers.get('x-cron-secret')
     // Cron mode ONLY when CRON_SECRET is configured AND the header matches exactly.
     if (CRON_SECRET && cronSecret === CRON_SECRET) {
-      const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      const supabase = serviceClient()
       const { data: profiles, error } = await supabase.from('profiles').select('id')
       if (error) throw new Error(error.message)
       let generated = 0
@@ -131,7 +120,10 @@ Deno.serve(async (req) => {
           generated += 1
           const note = (row?.ai_coach_note as string | undefined) ?? ''
           if (note) notifications.push({ user_id: p.id, title: 'Your morning coach note', body: note })
-        } catch (_e) { /* skip one bad user, keep the batch going */ }
+        } catch (e) {
+          // Skip one bad user, keep the batch going — but record why.
+          await logEdgeError(supabase, 'generate-daily-summary:cron-user', e, p.id)
+        }
       }
       // Best-effort: one send-push call for the whole batch (the single send path).
       if (notifications.length > 0) {
@@ -145,28 +137,21 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({ notifications }),
           })
-        } catch (_e) { /* push is best-effort; never fail the cron over it */ }
+        } catch (e) {
+          // Push is best-effort; never fail the cron over it.
+          await logEdgeError(supabase, 'generate-daily-summary:push', e)
+        }
       }
-      return new Response(JSON.stringify({ ok: true, generated }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+      return json({ ok: true, generated })
     }
 
     // User (lazy) mode: derive the single user from the JWT.
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const authClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } })
-    const { data: userData, error: userErr } = await authClient.auth.getUser()
-    if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } })
-    }
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
-    const todayRow = await generateForUser(userData.user.id, supabase)
-    return new Response(JSON.stringify(todayRow), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    userId = await requireUserId(req)
+    const supabase = serviceClient()
+    await enforceAiQuota(supabase, userId)
+    const todayRow = await generateForUser(userId, supabase)
+    return json(todayRow)
   } catch (e) {
-    try {
-      const svc = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
-      await logEdgeError(svc, 'generate-daily-summary', e)
-    } catch (_ignore) {
-      /* logging is best-effort */
-    }
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    return await errorResponse('generate-daily-summary', e, userId)
   }
 })

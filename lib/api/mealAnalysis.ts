@@ -1,8 +1,4 @@
-import { supabase } from '../supabase'
-import { messageForStatus } from '../utils/rateLimit'
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+import { invokeEdgeFunction } from './edgeFunction'
 
 export interface MealAnalysisResult {
   items: string[]
@@ -14,26 +10,6 @@ export interface MealAnalysisResult {
   suggestions: string
 }
 
-export async function analyzeMealPhoto(photoUrl: string, description?: string): Promise<MealAnalysisResult> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const accessToken = sessionData.session?.access_token ?? SUPABASE_ANON_KEY
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-meal-analysis`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ photo_url: photoUrl, description }),
-  })
-
-  const body: unknown = await response.json()
-
-  if (!response.ok) {
-    const fallback = (body as { error?: string } | null)?.error ?? `Meal analysis request failed with status ${response.status}`
-    throw new Error(messageForStatus(response.status, fallback))
-  }
-
-  return body as MealAnalysisResult
+export function analyzeMealPhoto(photoUrl: string, description?: string): Promise<MealAnalysisResult> {
+  return invokeEdgeFunction<MealAnalysisResult>('ai-meal-analysis', { photo_url: photoUrl, description }, { timeoutMs: 60_000 })
 }

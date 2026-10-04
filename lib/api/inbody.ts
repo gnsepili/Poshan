@@ -1,8 +1,5 @@
-import { supabase } from '../supabase'
-import { messageForStatus } from '../utils/rateLimit'
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+import { invokeEdgeFunction } from './edgeFunction'
+import { InBodyDetails } from '../../types'
 
 export interface InBodyAnalysisResult {
   weight_kg: number | null
@@ -10,30 +7,24 @@ export interface InBodyAnalysisResult {
   muscle_mass_kg: number | null
   visceral_fat: number | null
   bmr: number | null
+  bmi: number | null
+  body_fat_mass_kg: number | null
+  fat_free_mass_kg: number | null
+  total_body_water_l: number | null
+  ecw_tbw_ratio: number | null
+  inbody_score: number | null
+  smi: number | null
+  phase_angle: number | null
+  waist_hip_ratio: number | null
+  target_weight_kg: number | null
+  /** Test date printed on the sheet (YYYY-MM-DD), when readable. */
+  scan_date: string | null
+  details: InBodyDetails
   raw: Record<string, unknown>
   notes: string
 }
 
-export async function analyzeInBodyPhoto(photoPath: string): Promise<InBodyAnalysisResult> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const accessToken = sessionData.session?.access_token ?? SUPABASE_ANON_KEY
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-inbody-analysis`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ photo_url: photoPath }),
-  })
-
-  const body: unknown = await response.json()
-
-  if (!response.ok) {
-    const fallback = (body as { error?: string } | null)?.error ?? `InBody analysis request failed with status ${response.status}`
-    throw new Error(messageForStatus(response.status, fallback))
-  }
-
-  return body as InBodyAnalysisResult
+// Reading a dense sheet at high detail can take a while.
+export function analyzeInBodyPhoto(photoPath: string): Promise<InBodyAnalysisResult> {
+  return invokeEdgeFunction<InBodyAnalysisResult>('ai-inbody-analysis', { photo_url: photoPath }, { timeoutMs: 90_000 })
 }

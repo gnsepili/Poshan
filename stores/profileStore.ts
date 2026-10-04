@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/database.types'
 import { Profile, Goal } from '../types'
@@ -12,13 +14,15 @@ interface ProfileState {
   goals: Goal | null
   loading: boolean
   error: string | null
-  fetchProfile: (userId: string) => Promise<void>
-  fetchGoals: (userId: string) => Promise<void>
+  /** Resolves false when the request failed (vs. true with a null profile for a new user). */
+  fetchProfile: (userId: string) => Promise<boolean>
+  fetchGoals: (userId: string) => Promise<boolean>
   upsertProfile: (profile: Partial<Profile> & { id: string }) => Promise<void>
   upsertGoals: (goals: Partial<Goal> & { user_id: string }) => Promise<void>
 }
 
 export const useProfileStore = create<ProfileState>()(
+  persist(
   immer((set) => ({
     profile: null,
     goals: null,
@@ -37,9 +41,10 @@ export const useProfileStore = create<ProfileState>()(
         .maybeSingle()
       set((s) => {
         s.loading = false
-        s.profile = error ? null : (data as Profile | null)
+        if (!error) s.profile = data as Profile | null
         s.error = error?.message ?? null
       })
+      return !error
     },
 
     fetchGoals: async (userId) => {
@@ -55,9 +60,10 @@ export const useProfileStore = create<ProfileState>()(
         .maybeSingle()
       set((s) => {
         s.loading = false
-        s.goals = error ? null : (data as Goal | null)
+        if (!error) s.goals = data as Goal | null
         s.error = error?.message ?? null
       })
+      return !error
     },
 
     upsertProfile: async (profile) => {
@@ -87,5 +93,7 @@ export const useProfileStore = create<ProfileState>()(
         s.error = error?.message ?? null
       })
     },
-  }))
+  })),
+  cacheOptions<ProfileState>('profile', ['profile', 'goals'])
+  )
 )

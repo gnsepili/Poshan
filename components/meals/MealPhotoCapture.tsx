@@ -5,6 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { Camera } from 'lucide-react-native'
 import { supabase } from '../../lib/supabase'
+import { logError } from '../../lib/telemetry'
 import { useAuthStore } from '../../stores/authStore'
 import { Text } from '../ui'
 import { useThemeColors } from '../../lib/theme'
@@ -22,26 +23,31 @@ export function MealPhotoCapture({ onUploaded }: Props) {
 
   const pick = async () => {
     if (!user) return
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, mediaTypes: ['images'] })
-    if (result.canceled) return
-    const asset = result.assets[0]
-    setUri(asset.uri)
-    setUploading(true)
     setUploadError(null)
+    try {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.7, mediaTypes: ['images'] })
+      if (result.canceled) return
+      const asset = result.assets[0]
+      setUri(asset.uri)
+      setUploading(true)
 
-    const fileName = `${user.id}/${Date.now()}.jpg`
-    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
-    const arrayBuffer = decode(base64)
-    const { error } = await supabase.storage
-      .from('meal-photos')
-      .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
-    setUploading(false)
-    if (error) {
-      setUploadError(error.message)
-      return
+      const fileName = `${user.id}/${Date.now()}.jpg`
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
+      const { error } = await supabase.storage
+        .from('meal-photos')
+        .upload(fileName, decode(base64), { contentType: 'image/jpeg', upsert: false })
+      if (error) {
+        setUploadError(`Couldn't upload the photo: ${error.message}`)
+        return
+      }
+      const { data } = supabase.storage.from('meal-photos').getPublicUrl(fileName)
+      onUploaded(data.publicUrl)
+    } catch (e) {
+      logError('meal-photo-capture', e)
+      setUploadError("Couldn't take or read the photo. Check camera permission and try again.")
+    } finally {
+      setUploading(false)
     }
-    const { data } = supabase.storage.from('meal-photos').getPublicUrl(fileName)
-    onUploaded(data.publicUrl)
   }
 
   if (uploading) {

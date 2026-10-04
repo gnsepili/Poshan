@@ -75,14 +75,15 @@
         }
       ],
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},
       "eas": {
         "projectId": "e0aed009-415a-478c-9917-3cb381442217"
       },
-      "privacyPolicyUrl": "https://poshanai.app/privacy"
+      "privacyPolicyUrl": "https://gnsepili.github.io/Poshan/privacy/"
     },
     "owner": "gnsepili"
   }

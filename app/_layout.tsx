@@ -23,17 +23,28 @@ import { useAuthStore } from '../stores/authStore'
 import { useProfileStore } from '../stores/profileStore'
 import { usePushStore } from '../stores/pushStore'
 import { useMealsStore } from '../stores/mealsStore'
+import { useActivityStore } from '../stores/activityStore'
+import { useDailySummaryStore } from '../stores/dailySummaryStore'
+import { useInbodyStore } from '../stores/inbodyStore'
+import { usePlansStore } from '../stores/plansStore'
+import { useChatStore } from '../stores/chatStore'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import { logError } from '../lib/telemetry'
+import { installGlobalErrorHandler } from '../lib/globalErrorHandler'
+import { onboardingStatus, redirectFor } from '../lib/utils/onboarding'
+import { whenHydrated } from '../lib/cacheHydration'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
+installGlobalErrorHandler()
 
 export default function RootLayout() {
   const { session, user, initialize } = useAuthStore()
-  const { profile, fetchProfile } = useProfileStore()
+  const { profile, goals, fetchProfile, fetchGoals } = useProfileStore()
   const { registerForPush } = usePushStore()
   const { flushQueue, loadPendingCount } = useMealsStore()
   const [authReady, setAuthReady] = useState(false)
-  const [profileChecked, setProfileChecked] = useState(false)
+  const [cacheReady, setCacheReady] = useState(false)
+  const [onboardingCheck, setOnboardingCheck] = useState({ checked: false, fetchFailed: false })
   const router = useRouter()
   const segments = useSegments()
   const [fontsLoaded] = useFonts({
@@ -53,59 +64,94 @@ export default function RootLayout() {
     setColorScheme(systemScheme === 'dark' ? 'dark' : 'light')
   }, [systemScheme, setColorScheme])
 
+  // Cached data must be loaded before anything fetches fresh data over it.
   useEffect(() => {
-    let cleanupFn: (() => void) | undefined
-    initialize().then((fn) => {
-      cleanupFn = fn
-      setAuthReady(true)
-    })
-    return () => cleanupFn?.()
+    whenHydrated(
+      [useMealsStore, useProfileStore, useActivityStore, useDailySummaryStore, useInbodyStore, usePlansStore, useChatStore],
+      2000
+    ).then(() => setCacheReady(true))
   }, [])
 
   useEffect(() => {
-    if (session && user) {
-      fetchProfile(user.id).finally(() => setProfileChecked(true))
-      registerForPush(user.id)
-    } else {
-      setProfileChecked(false)
+    let cleanupFn: (() => void) | undefined
+    initialize()
+      .then((fn) => {
+        cleanupFn = fn
+      })
+      // A failed session restore must not leave the app on a blank screen forever:
+      // fall through to the login screen instead.
+      .catch((e) => logError('auth-initialize', e))
+      .finally(() => setAuthReady(true))
+    return () => cleanupFn?.()
+  }, [])
+
+  // Keyed on the user id (not the session object) so token refreshes don't re-run it.
+  // checkAttempt re-runs it when a failed check is retried (see the AppState effect below).
+  const userId = user?.id
+  const [checkAttempt, setCheckAttempt] = useState(0)
+  useEffect(() => {
+    setOnboardingCheck({ checked: false, fetchFailed: false })
+    if (!session || !userId || !cacheReady) return
+    // Never judge this user by another user's profile/goals still in memory.
+    const cached = useProfileStore.getState()
+    if ((cached.profile && cached.profile.id !== userId) || (cached.goals && cached.goals.user_id !== userId)) {
+      useProfileStore.setState({ profile: null, goals: null })
     }
-  }, [session, user])
+    let cancelled = false
+    Promise.all([fetchProfile(userId), fetchGoals(userId)])
+      .then(([profileOk, goalsOk]) => {
+        if (!cancelled) setOnboardingCheck({ checked: true, fetchFailed: !(profileOk && goalsOk) })
+      })
+      .catch(() => {
+        if (!cancelled) setOnboardingCheck({ checked: true, fetchFailed: true })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [!!session, userId, checkAttempt, cacheReady])
 
   useEffect(() => {
-    if (!session || !user) return
-    loadPendingCount()
+    if (session && userId) registerForPush(userId)
+  }, [!!session, userId])
+
+  // A failed check (e.g. offline launch) is retried when the app returns to the foreground,
+  // so a new user isn't left outside onboarding until the next restart.
+  useEffect(() => {
+    if (!onboardingCheck.fetchFailed) return
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') setCheckAttempt((n) => n + 1)
+    })
+    return () => sub.remove()
+  }, [onboardingCheck.fetchFailed])
+
+  useEffect(() => {
+    if (!session || !userId) return
+    const flush = () => flushQueue().catch((e) => logError('meal-queue-flush', e))
+    loadPendingCount().catch((e) => logError('meal-queue-count', e))
     const unsubscribeNet = NetInfo.addEventListener((state) => {
-      if (state.isConnected) flushQueue()
+      if (state.isConnected) flush()
     })
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') flushQueue()
+      if (next === 'active') flush()
     })
     return () => {
       unsubscribeNet()
       sub.remove()
     }
-  }, [session, user])
+  }, [!!session, userId])
 
+  const status = onboardingStatus({
+    ...onboardingCheck,
+    hasProfile: !!profile,
+    hasGoals: !!goals,
+  })
   useEffect(() => {
     if (!authReady) return
-    const inAuthGroup = segments[0] === '(auth)'
-    const inOnboarding = segments[0] === '(onboarding)'
+    const target = redirectFor({ hasSession: !!session, status, group: segments[0] })
+    if (target) router.replace(target as never)
+  }, [session, status, authReady, segments])
 
-    if (!session) {
-      if (!inAuthGroup) router.replace('/(auth)/login')
-      return
-    }
-
-    if (!profileChecked) return
-
-    if (!profile) {
-      if (!inOnboarding) router.replace('/(onboarding)/profile')
-    } else if (inAuthGroup || inOnboarding) {
-      router.replace('/(tabs)')
-    }
-  }, [session, profile, profileChecked, authReady, segments])
-
-  const appReady = fontsLoaded && authReady
+  const appReady = fontsLoaded && authReady && cacheReady
   const onLayoutRootView = useCallback(() => {
     if (appReady) SplashScreen.hideAsync().catch(() => {})
   }, [appReady])

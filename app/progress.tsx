@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { TrendingUp } from 'lucide-react-native'
@@ -10,10 +9,13 @@ import { BarChart } from '../components/ui/BarChart'
 import { Screen, Card, Heading, Text, EmptyState } from '../components/ui'
 import { useThemeColors } from '../lib/theme'
 import { adherenceSeries } from '../lib/utils/chart'
+import { useAutoRefresh } from '../lib/hooks/useAutoRefresh'
 import { InBodyReport } from '../types'
 
 // Oldest-first series of a single metric, dropping scans where it was not read.
-function series(reports: InBodyReport[], key: 'weight_kg' | 'body_fat_pct' | 'muscle_mass_kg') {
+type TrendKey = 'weight_kg' | 'body_fat_pct' | 'muscle_mass_kg' | 'body_fat_mass_kg' | 'inbody_score' | 'ecw_tbw_ratio'
+
+function series(reports: InBodyReport[], key: TrendKey) {
   return [...reports]
     .sort((a, b) => new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime())
     .filter((r) => r[key] !== null)
@@ -27,13 +29,20 @@ export default function ProgressScreen() {
   const { reports, fetchReports, loading, error } = useInbodyStore()
   const { recent, fetchRecent, error: adherenceError } = useDailySummaryStore()
 
-  useEffect(() => { if (user) { fetchReports(user.id); fetchRecent(user.id) } }, [user])
+  const { refreshing, onRefresh } = useAutoRefresh(
+    () => (user ? Promise.all([fetchReports(user.id), fetchRecent(user.id)]) : undefined),
+    { enabled: !!user }
+  )
 
   const charts: { title: string; color: string; data: { label: string; value: number }[] }[] = [
     { title: 'Weight (kg)', color: colors.primary, data: series(reports, 'weight_kg') },
     { title: 'Body fat (%)', color: colors.accent, data: series(reports, 'body_fat_pct') },
     { title: 'Muscle mass (kg)', color: colors.info, data: series(reports, 'muscle_mass_kg') },
-  ]
+    { title: 'Body fat mass (kg)', color: colors.accent, data: series(reports, 'body_fat_mass_kg') },
+    { title: 'InBody score', color: colors.primary, data: series(reports, 'inbody_score') },
+    { title: 'ECW / TBW ratio', color: colors.info, data: series(reports, 'ecw_tbw_ratio') },
+    // Newer metrics only exist on fully-read scans; hide a chart until it has a trend.
+  ].filter((c, i) => i < 3 || c.data.length >= 2)
 
   const adherence = adherenceSeries(
     recent.map((r) => ({
@@ -46,16 +55,16 @@ export default function ProgressScreen() {
   const errorMessage = error ?? adherenceError
 
   return (
-    <Screen back title="Body progress" scroll>
+    <Screen back title="Body progress" scroll refreshing={refreshing} onRefresh={onRefresh}>
       {errorMessage ? (
         <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
           <Text variant="bodySm" className="text-danger">{errorMessage}</Text>
         </View>
       ) : null}
 
-      {loading ? <ActivityIndicator className="mt-8" color={colors.primary} /> : null}
+      {loading && reports.length === 0 ? <ActivityIndicator className="mt-8" color={colors.primary} /> : null}
 
-      {!loading && reports.length < 2 ? (
+      {!(loading && reports.length === 0) && reports.length < 2 ? (
         <EmptyState
           icon={TrendingUp}
           title="No data yet"
@@ -65,7 +74,7 @@ export default function ProgressScreen() {
         />
       ) : null}
 
-      {!loading && reports.length >= 2 ? (
+      {reports.length >= 2 ? (
         <View className="gap-4 mb-4">
           {charts.map((c) => (
             <Card key={c.title}>
@@ -76,7 +85,7 @@ export default function ProgressScreen() {
         </View>
       ) : null}
 
-      {!loading ? (
+      {!(loading && reports.length === 0) ? (
         <Card>
           <Heading level={4} uppercase className="mb-3">Calorie adherence (last 30 days)</Heading>
           {adherence.length === 0 ? (

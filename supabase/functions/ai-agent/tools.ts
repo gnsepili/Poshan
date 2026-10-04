@@ -82,7 +82,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'get_inbody_history',
-      description: "Get the user's InBody body-composition scans over time (weight, body fat %, muscle mass, visceral fat, BMR), most recent first.",
+      description: "Get the user's InBody body-composition scans over time (weight, body fat %, skeletal muscle mass, visceral fat, BMR, BMI, fat mass, fat-free mass, body water, ECW/TBW ratio, InBody score, SMI, phase angle, waist-hip ratio, target weight), most recent first. The latest scan's full sheet (segmental analysis etc.) is already in your context.",
       parameters: {
         type: 'object',
         properties: { limit: { type: 'number', description: 'Max scans to return, default 10' } },
@@ -317,7 +317,7 @@ export async function executeTool(
     const limit = Math.min(Math.max(1, typeof input.limit === 'number' ? input.limit : 10), 50)
     const { data, error } = await supabase
       .from('inbody_reports')
-      .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, visceral_fat, bmr, ai_notes')
+      .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, visceral_fat, bmr, bmi, body_fat_mass_kg, fat_free_mass_kg, total_body_water_l, ecw_tbw_ratio, inbody_score, smi, phase_angle, waist_hip_ratio, target_weight_kg, ai_notes')
       .eq('user_id', userId)
       .order('scanned_at', { ascending: false })
       .limit(limit)
@@ -374,7 +374,7 @@ export async function executeTool(
       : new Date(new Date(`${end}T00:00:00Z`).getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const [inbodyRes, dailyRes] = await Promise.all([
       supabase.from('inbody_reports')
-        .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg')
+        .select('scanned_at, weight_kg, body_fat_pct, muscle_mass_kg, body_fat_mass_kg, ecw_tbw_ratio, inbody_score')
         .eq('user_id', userId)
         .gte('scanned_at', `${start}T00:00:00`).lte('scanned_at', `${end}T23:59:59`)
         .order('scanned_at', { ascending: true }),

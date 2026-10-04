@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
 import { Mail, Lock, Eye, EyeOff, Leaf } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton'
 import { Button, Input, Heading, Text } from '../../components/ui'
 import { useThemeColors } from '../../lib/theme'
 
@@ -69,6 +70,8 @@ export default function LoginScreen() {
         <View className="mt-6">
           <Button label="Sign in" loading={loading} onPress={() => signIn(email, password)} />
         </View>
+
+        <GoogleSignInButton />
 
         <View className="flex-row justify-center mt-6">
           <Text variant="bodySm" muted>No account? </Text>

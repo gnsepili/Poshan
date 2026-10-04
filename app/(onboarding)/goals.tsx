@@ -1,56 +1,82 @@
 import { useState } from 'react'
 import { View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Scale, Flame, Footprints } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useProfileStore } from '../../stores/profileStore'
 import { Screen, Heading, Text, Input, Card, Button } from '../../components/ui'
 
+const toText = (n: number | null | undefined): string => (n ? String(n) : '')
+
 export default function OnboardingGoalsScreen() {
   const router = useRouter()
+  // Settings opens this screen with ?mode=edit to change existing goals.
+  const editing = useLocalSearchParams<{ mode?: string }>().mode === 'edit'
   const { user } = useAuthStore()
-  const { upsertGoals, loading, error } = useProfileStore()
-  const [targetWeight, setTargetWeight] = useState('')
-  const [calories, setCalories] = useState('')
-  const [protein, setProtein] = useState('')
-  const [carbs, setCarbs] = useState('')
-  const [fat, setFat] = useState('')
-  const [steps, setSteps] = useState('8000')
+  const { goals, upsertGoals, loading, error } = useProfileStore()
+  const [targetWeight, setTargetWeight] = useState(toText(goals?.target_weight_kg))
+  const [calories, setCalories] = useState(toText(goals?.daily_calorie_target))
+  const [protein, setProtein] = useState(toText(goals?.daily_protein_g))
+  const [carbs, setCarbs] = useState(toText(goals?.daily_carbs_g))
+  const [fat, setFat] = useState(toText(goals?.daily_fat_g))
+  const [steps, setSteps] = useState(toText(goals?.daily_steps_target) || '8000')
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const handleNext = async () => {
+  const handleSave = async () => {
     if (!user) return
-    await upsertGoals({
-      user_id: user.id,
+    const parsed = {
       target_weight_kg: parseFloat(targetWeight),
       daily_calorie_target: parseInt(calories, 10),
       daily_protein_g: parseInt(protein, 10),
       daily_carbs_g: parseInt(carbs, 10),
       daily_fat_g: parseInt(fat, 10),
       daily_steps_target: parseInt(steps, 10),
-    })
-    if (useProfileStore.getState().error === null) {
-      router.push('/(onboarding)/ai-setup')
     }
+    if (Object.values(parsed).some((v) => !Number.isFinite(v) || v < 0) || parsed.daily_calorie_target < 800) {
+      setFormError('Please fill in every field with a valid number (at least 800 kcal a day).')
+      return
+    }
+    setFormError(null)
+    // Goals are append-only: carry over what this form doesn't edit (coach-set targets/notes).
+    await upsertGoals({
+      user_id: user.id,
+      target_body_fat_pct: goals?.target_body_fat_pct ?? null,
+      target_muscle_mass_kg: goals?.target_muscle_mass_kg ?? null,
+      notes: goals?.notes ?? '',
+      ...parsed,
+    })
+    if (useProfileStore.getState().error !== null) return
+    if (editing) router.back()
+    else router.replace('/(tabs)')
   }
 
-  return (
-    <Screen scroll footer={<Button label="Next: AI setup" loading={loading} onPress={handleNext} />}>
-      <View className="mt-1 mb-6">
-        <Text variant="caption" muted className="uppercase tracking-wide">
-          Step 2 of 3
-        </Text>
-        <Heading level={1} uppercase>
-          Your goals
-        </Heading>
-        <Text variant="body" muted className="mt-1">
-          Set the targets we&apos;ll track against every day.
-        </Text>
-      </View>
+  const shownError = formError ?? error
 
-      {error ? (
+  return (
+    <Screen
+      scroll
+      back={editing}
+      title={editing ? 'Goals' : undefined}
+      footer={<Button label={editing ? 'Save changes' : 'Start coaching'} loading={loading} onPress={handleSave} />}
+    >
+      {editing ? null : (
+        <View className="mt-1 mb-6">
+          <Text variant="caption" muted className="uppercase tracking-wide">
+            Step 2 of 2
+          </Text>
+          <Heading level={1} uppercase>
+            Your goals
+          </Heading>
+          <Text variant="body" muted className="mt-1">
+            Set the targets we&apos;ll track against every day.
+          </Text>
+        </View>
+      )}
+
+      {shownError ? (
         <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
           <Text variant="bodySm" className="text-danger">
-            {error}
+            {shownError}
           </Text>
         </View>
       ) : null}

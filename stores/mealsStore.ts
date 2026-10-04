@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
+import { randomUUID } from 'expo-crypto'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
@@ -40,8 +43,13 @@ async function uploadQueuedPhoto(item: QueuedMeal): Promise<string | undefined> 
 
 const isDuplicateKey = (message: string): boolean => /duplicate key|already exists/i.test(message)
 
+// What happened to a meal the user tried to log — the screen keeps its form open on 'failed'.
+export type AddMealResult = { status: 'saved'; meal: Meal } | { status: 'queued' } | { status: 'failed'; error: string }
+
 interface MealsState {
   meals: Meal[]
+  /** The day `meals` was fetched for (drops stale cached data after midnight). */
+  mealsDay: string | null
   loading: boolean
   error: string | null
   pendingCount: number
@@ -54,12 +62,14 @@ interface MealsState {
       photo_url?: string
       ai_suggestions?: string | null
     }
-  ) => Promise<Meal | null>
+  ) => Promise<AddMealResult>
 }
 
 export const useMealsStore = create<MealsState>()(
+  persist(
   immer((set, get) => ({
     meals: [],
+    mealsDay: null,
     loading: false,
     error: null,
     pendingCount: 0,
@@ -79,7 +89,11 @@ export const useMealsStore = create<MealsState>()(
         .order('logged_at', { ascending: false })
       set((s) => {
         s.loading = false
-        s.meals = error ? [] : (data as Meal[])
+        // On failure keep what's cached rather than blanking the screen.
+        if (!error) {
+          s.meals = data as Meal[]
+          s.mealsDay = today
+        }
         s.error = error?.message ?? null
       })
     },
@@ -96,20 +110,38 @@ export const useMealsStore = create<MealsState>()(
         s.loading = true
         s.error = null
       })
-      const id = crypto.randomUUID()
+      const id = randomUUID()
       const loggedAt = new Date().toISOString()
       const payload = { id, ...meal, logged_at: loggedAt } as unknown as MealInsert
+
+      // postgrest-js resolves (never rejects) on a dropped connection, reporting status 0;
+      // the catch only guards against a client that does throw.
+      let offline = false
       try {
-        const { data, error } = await supabase.from('meals').insert(payload).select().single()
-        set((s) => {
-          s.loading = false
-          if (!error && data) s.meals.unshift(data as Meal)
-          s.error = error?.message ?? null
-        })
-        if (!error && data) logEvent('meal_logged', { meal_type: meal.meal_type }, meal.user_id)
-        return error ? null : (data as Meal)
+        const { data, error, status } = await supabase.from('meals').insert(payload).select().single()
+        if (!error && data) {
+          set((s) => {
+            s.loading = false
+            s.meals.unshift(data as Meal)
+          })
+          logEvent('meal_logged', { meal_type: meal.meal_type }, meal.user_id)
+          return { status: 'saved', meal: data as Meal }
+        }
+        if (status !== 0) {
+          const message = error?.message ?? 'Could not save the meal.'
+          set((s) => {
+            s.loading = false
+            s.error = message
+          })
+          return { status: 'failed', error: message }
+        }
+        offline = true
       } catch (_networkErr) {
-        // No connectivity: queue for flush on reconnect (photos keep their local URI).
+        offline = true
+      }
+
+      // No connectivity: queue for flush on reconnect (photos keep their local URI).
+      if (offline) {
         const queued: QueuedMeal = {
           id,
           user_id: meal.user_id,
@@ -120,18 +152,30 @@ export const useMealsStore = create<MealsState>()(
           carbs_g: meal.carbs_g,
           fat_g: meal.fat_g,
           fiber_g: meal.fiber_g ?? 0,
-          photo_local_uri: meal.photo_url && meal.photo_url.startsWith('file:') ? meal.photo_url : undefined,
+          // A local photo is uploaded on flush; an already-uploaded one is kept as-is.
+          photo_local_uri: meal.photo_url?.startsWith('file:') ? meal.photo_url : undefined,
+          photo_url: meal.photo_url && !meal.photo_url.startsWith('file:') ? meal.photo_url : undefined,
+          ai_suggestions: meal.ai_suggestions ?? null,
           queued_at: loggedAt,
         }
-        const q = enqueueMeal(await readQueue(), queued)
-        await writeQueue(q)
-        set((s) => {
-          s.loading = false
-          s.pendingCount = q.length
-          s.error = 'Saved offline — will sync when you reconnect.'
-        })
-        return null
+        try {
+          const q = enqueueMeal(await readQueue(), queued)
+          await writeQueue(q)
+          set((s) => {
+            s.loading = false
+            s.pendingCount = q.length // the screen's pending banner is the user-facing signal
+          })
+          return { status: 'queued' }
+        } catch (_storageErr) {
+          // fall through: neither saved nor queued
+        }
       }
+      const message = "You're offline and the meal couldn't be saved on this device. Please try again."
+      set((s) => {
+        s.loading = false
+        s.error = message
+      })
+      return { status: 'failed', error: message }
     },
 
     flushQueue: async () => {
@@ -176,6 +220,7 @@ export const useMealsStore = create<MealsState>()(
               fat_g: item.fat_g,
               fiber_g: item.fiber_g,
               photo_url: photo_url ?? null,
+              ai_suggestions: item.ai_suggestions ?? null,
               logged_at: item.queued_at,
             } as unknown as MealInsert)
             // Duplicate PK => this meal was already inserted by an earlier flaky flush: done, not an error.
@@ -195,5 +240,7 @@ export const useMealsStore = create<MealsState>()(
         })
       }
     },
-  }))
+  })),
+  cacheOptions<MealsState>('meals', ['meals', 'mealsDay'], { dayKey: 'mealsDay', dayScoped: ['meals'] })
+  )
 )

@@ -1,10 +1,11 @@
 import { ReactNode } from 'react'
-import { ScrollView, View } from 'react-native'
+import { RefreshControl, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
 import { Heading, Text } from './Text'
 import { IconButton } from './IconButton'
+import { useThemeColors } from '../../lib/theme'
 
 export interface ScreenProps {
   children: ReactNode
@@ -21,6 +22,9 @@ export interface ScreenProps {
   /** Apply horizontal page padding to content (default true). */
   padded?: boolean
   contentClassName?: string
+  /** Pull-to-refresh (scroll screens only). */
+  refreshing?: boolean
+  onRefresh?: () => void
 }
 
 /**
@@ -37,9 +41,12 @@ export function Screen({
   footer,
   padded = true,
   contentClassName = '',
+  refreshing = false,
+  onRefresh,
 }: ScreenProps) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const colors = useThemeColors()
   const hasHeader = back || !!title || !!headerRight
   const pad = padded ? 'px-5' : ''
 
@@ -81,6 +88,11 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: (footer ? 16 : insets.bottom) + 24 }}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+            ) : undefined
+          }
         >
           {body}
         </ScrollView>

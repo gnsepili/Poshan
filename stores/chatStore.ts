@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
+import { randomUUID } from 'expo-crypto'
 import { sendAgentMessage } from '../lib/api/agent'
 import { supabase } from '../lib/supabase'
 import { ChatMessage, ChatRole } from '../types'
@@ -16,6 +19,7 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>()(
+  persist(
   immer((set, get) => ({
     messages: [],
     conversationId: null,
@@ -24,7 +28,7 @@ export const useChatStore = create<ChatState>()(
 
     sendMessage: async (content) => {
       const userMsg: ChatHistoryMessage = {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         conversation_id: get().conversationId ?? '',
         role: 'user',
         content,
@@ -38,7 +42,7 @@ export const useChatStore = create<ChatState>()(
       try {
         const { reply, conversation_id } = await sendAgentMessage(content, get().conversationId ?? undefined)
         const assistantMsg: ChatHistoryMessage = {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           conversation_id,
           role: 'assistant',
           content: reply,
@@ -50,7 +54,10 @@ export const useChatStore = create<ChatState>()(
           s.loading = false
         })
       } catch (e) {
+        // Drop the optimistic message: the screen puts the text back in the input,
+        // so a resend never shows the same message twice.
         set((s) => {
+          s.messages = s.messages.filter((m) => m.id !== userMsg.id)
           s.loading = false
           s.error = e instanceof Error ? e.message : String(e)
         })
@@ -90,18 +97,19 @@ export const useChatStore = create<ChatState>()(
         return
       }
 
+      // Latest 50 (newest-first from the DB), shown oldest-first.
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('conversation_id', latest.conversation_id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(50)
 
       set((s) => {
         s.loading = false
         s.error = error?.message ?? null
         if (!error && data) {
-          s.messages = data.map((m) => ({
+          s.messages = [...data].reverse().map((m) => ({
             id: m.id,
             conversation_id: m.conversation_id,
             role: m.role as ChatRole,
@@ -112,5 +120,7 @@ export const useChatStore = create<ChatState>()(
         }
       })
     },
-  }))
+  })),
+  cacheOptions<ChatState>('chat', ['messages', 'conversationId'])
+  )
 )

@@ -6,16 +6,17 @@ jest.mock('../../lib/supabase', () => ({ supabase: { from: jest.fn(), storage: {
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn(),
 }))
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'client-uuid-1' }))
 jest.mock('expo-file-system/legacy', () => ({
   readAsStringAsync: jest.fn().mockResolvedValue('base64data'),
   EncodingType: { Base64: 'base64' },
 }))
 
-const mockInsertResult = (error: unknown = null) => {
+const mockInsertResult = (error: unknown = null, status = error ? 400 : 201) => {
   const chain = { insert: jest.fn(), select: jest.fn(), single: jest.fn() }
   chain.insert.mockReturnValue(chain)
   chain.select.mockReturnValue(chain)
-  chain.single.mockResolvedValue({ data: { id: 'meal-1' }, error })
+  chain.single.mockResolvedValue({ data: error ? null : { id: 'meal-1' }, error, status })
   ;(supabase.from as jest.Mock).mockReturnValue(chain)
   return chain
 }
@@ -28,10 +29,57 @@ describe('mealsStore', () => {
     ;(AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined)
   })
 
-  it('sets error on a failed (non-network) insert', async () => {
+  it('sets error and reports failure on a failed (non-network) insert', async () => {
     mockInsertResult({ message: 'insert failed' })
-    await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
+    const res = await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
+    expect(res).toEqual({ status: 'failed', error: 'insert failed' })
     expect(useMealsStore.getState().error).toBe('insert failed')
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled()
+  })
+
+  it('reports a saved meal and uses a client-generated id without a global crypto object', async () => {
+    const original = globalThis.crypto
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true, writable: true })
+    try {
+      const chain = mockInsertResult()
+      const res = await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
+      expect(res.status).toBe('saved')
+      expect(chain.insert.mock.calls[0][0].id).toBe('client-uuid-1')
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true, writable: true })
+    }
+  })
+
+  it('queues the meal offline when supabase reports a network failure (status 0, resolved — not thrown)', async () => {
+    // postgrest-js never rejects on a dropped connection: it resolves { error, status: 0 }.
+    mockInsertResult({ message: 'TypeError: Network request failed', code: '' }, 0)
+    const res = await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
+    expect(res).toEqual({ status: 'queued' })
+    const written = JSON.parse((AsyncStorage.setItem as jest.Mock).mock.calls[0][1])
+    expect(written).toHaveLength(1)
+    expect(written[0].id).toBe('client-uuid-1')
+    expect(useMealsStore.getState().pendingCount).toBe(1)
+    expect(useMealsStore.getState().error).toBeNull()
+  })
+
+  it('keeps an already-uploaded photo and the AI suggestion when a photo meal is queued offline', async () => {
+    mockInsertResult({ message: 'TypeError: Network request failed', code: '' }, 0)
+    await useMealsStore.getState().addMeal({
+      user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2,
+      photo_url: 'https://x.supabase.co/storage/v1/object/public/meal-photos/u1/1.jpg', ai_suggestions: 'Add greens',
+    })
+    const [queued] = JSON.parse((AsyncStorage.setItem as jest.Mock).mock.calls[0][1])
+    expect(queued.photo_url).toBe('https://x.supabase.co/storage/v1/object/public/meal-photos/u1/1.jpg')
+    expect(queued.photo_local_uri).toBeUndefined()
+    expect(queued.ai_suggestions).toBe('Add greens')
+  })
+
+  it('reports failure (not a stuck spinner) when queueing offline itself fails', async () => {
+    mockInsertResult({ message: 'TypeError: Network request failed', code: '' }, 0)
+    ;(AsyncStorage.setItem as jest.Mock).mockRejectedValue(new Error('disk full'))
+    const res = await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
+    expect(res.status).toBe('failed')
+    expect(useMealsStore.getState().loading).toBe(false)
   })
 
   it('queues the meal offline when the insert throws (no connectivity)', async () => {
@@ -43,12 +91,12 @@ describe('mealsStore', () => {
 
     const res = await useMealsStore.getState().addMeal({ user_id: 'u1', meal_type: 'lunch', description: 'rice', total_calories: 400, protein_g: 10, carbs_g: 70, fat_g: 5, fiber_g: 2 })
 
-    expect(res).toBeNull()
+    expect(res).toEqual({ status: 'queued' })
     expect(AsyncStorage.setItem).toHaveBeenCalled()
     const written = JSON.parse((AsyncStorage.setItem as jest.Mock).mock.calls[0][1])
     expect(written).toHaveLength(1)
     expect(useMealsStore.getState().pendingCount).toBe(1)
-    expect(useMealsStore.getState().error).toMatch(/saved offline/i)
+    expect(useMealsStore.getState().error).toBeNull()
   })
 
   it('flushQueue inserts each queued meal exactly once, in order, then clears', async () => {
@@ -238,5 +286,23 @@ describe('mealsStore', () => {
     const lastWrite = (AsyncStorage.setItem as jest.Mock).mock.calls.at(-1)?.[1]
     expect(JSON.parse(lastWrite)).toEqual([])
     expect(useMealsStore.getState().pendingCount).toBe(0)
+  })
+
+  it("caches today's meals on the device and keeps them when a refresh fails (offline)", async () => {
+    const day = new Date().toISOString().split('T')[0]
+    const ok = { select: jest.fn(), eq: jest.fn(), gte: jest.fn(), order: jest.fn() }
+    ok.select.mockReturnValue(ok); ok.eq.mockReturnValue(ok); ok.gte.mockReturnValue(ok)
+    ok.order.mockResolvedValue({ data: [{ id: 'm1' }], error: null })
+    ;(supabase.from as jest.Mock).mockReturnValue(ok)
+    await useMealsStore.getState().fetchTodayMeals('u1')
+
+    const { cacheStorage } = require('../../lib/cacheStorage')
+    const cached = cacheStorage.getItem('poshan.cache.meals')
+    expect(cached.state).toEqual({ meals: [{ id: 'm1' }], mealsDay: day })
+
+    ok.order.mockResolvedValue({ data: null, error: { message: 'TypeError: Network request failed' } })
+    await useMealsStore.getState().fetchTodayMeals('u1')
+    expect(useMealsStore.getState().meals).toEqual([{ id: 'm1' }])
+    expect(useMealsStore.getState().error).toMatch(/network/i)
   })
 })

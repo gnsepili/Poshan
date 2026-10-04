@@ -1,38 +1,15 @@
-import { supabase } from '../supabase'
-import { messageForStatus } from '../utils/rateLimit'
-
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+import { invokeEdgeFunction } from './edgeFunction'
 
 export interface AgentResponse {
   reply: string
   conversation_id: string
 }
 
-export async function sendAgentMessage(
-  message: string,
-  conversationId?: string,
-  photoUrl?: string
-): Promise<AgentResponse> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const accessToken = sessionData.session?.access_token ?? SUPABASE_ANON_KEY
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-agent`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ message, conversation_id: conversationId, photo_url: photoUrl }),
-  })
-
-  const body: unknown = await response.json()
-
-  if (!response.ok) {
-    const fallback = (body as { error?: string } | null)?.error ?? `Agent request failed with status ${response.status}`
-    throw new Error(messageForStatus(response.status, fallback))
-  }
-
-  return body as AgentResponse
+// The agent may chain several model + tool calls, so it gets a longer timeout.
+export function sendAgentMessage(message: string, conversationId?: string, photoUrl?: string): Promise<AgentResponse> {
+  return invokeEdgeFunction<AgentResponse>(
+    'ai-agent',
+    { message, conversation_id: conversationId, photo_url: photoUrl },
+    { timeoutMs: 90_000 }
+  )
 }

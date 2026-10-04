@@ -11,7 +11,8 @@ describe('analyzeInBodyPhoto', () => {
   it('passes null metrics through unchanged', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ weight_kg: 72.5, body_fat_pct: null, muscle_mass_kg: null, visceral_fat: 8, bmr: null, raw: { Weight: '72.5' }, notes: 'nice' }),
+      status: 200,
+      text: async () => JSON.stringify({ weight_kg: 72.5, body_fat_pct: null, muscle_mass_kg: null, visceral_fat: 8, bmr: null, raw: { Weight: '72.5' }, notes: 'nice' }),
     }) as unknown as typeof fetch
     const result = await analyzeInBodyPhoto('u1/scan.jpg')
     expect(result.weight_kg).toBe(72.5)
@@ -21,7 +22,7 @@ describe('analyzeInBodyPhoto', () => {
   })
 
   it('throws with the server error message on non-ok', async () => {
-    globalThis.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'bad photo' }) }) as unknown as typeof fetch
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, text: async () => JSON.stringify({ error: 'bad photo' }) }) as unknown as typeof fetch
     await expect(analyzeInBodyPhoto('u1/scan.jpg')).rejects.toThrow('bad photo')
   })
 })

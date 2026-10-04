@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/database.types'
 import { ActivityLog, ActivityType } from '../types'
@@ -17,6 +19,8 @@ export interface NewActivity {
 
 interface ActivityState {
   todayActivity: ActivityLog[]
+  /** The day todayActivity was fetched for (drops stale cached data after midnight). */
+  activityDay: string | null
   loading: boolean
   error: string | null
   fetchTodayActivity: (userId: string) => Promise<void>
@@ -24,8 +28,10 @@ interface ActivityState {
 }
 
 export const useActivityStore = create<ActivityState>()(
+  persist(
   immer((set) => ({
     todayActivity: [],
+    activityDay: null,
     loading: false,
     error: null,
 
@@ -41,7 +47,11 @@ export const useActivityStore = create<ActivityState>()(
         .order('logged_at', { ascending: false })
       set((s) => {
         s.loading = false
-        s.todayActivity = error ? [] : (data as ActivityLog[])
+        // On failure keep what's cached rather than blanking the screen.
+        if (!error) {
+          s.todayActivity = data as ActivityLog[]
+          s.activityDay = today
+        }
         s.error = error?.message ?? null
       })
     },
@@ -60,5 +70,7 @@ export const useActivityStore = create<ActivityState>()(
       })
       return error ? null : (data as ActivityLog)
     },
-  }))
+  })),
+  cacheOptions<ActivityState>('activity', ['todayActivity', 'activityDay'], { dayKey: 'activityDay', dayScoped: ['todayActivity'] })
+  )
 )

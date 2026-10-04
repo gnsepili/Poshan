@@ -5,6 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { Camera, Images } from 'lucide-react-native'
 import { supabase } from '../../lib/supabase'
+import { logError } from '../../lib/telemetry'
 import { useAuthStore } from '../../stores/authStore'
 import { PressableCard, Button, Text } from '../ui'
 import { useThemeColors } from '../../lib/theme'
@@ -24,27 +25,36 @@ export function InBodyPhotoCapture({ onUploaded }: Props) {
     if (!user) return
     setUri(asset.uri)
     setUploading(true)
-    setUploadError(null)
     // Private bucket: store the PATH; the analysis fn and reads sign it server-side.
     const path = `${user.id}/${Date.now()}.jpg`
-    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
-    const arrayBuffer = decode(base64)
-    const { error } = await supabase.storage
-      .from('inbody-photos')
-      .upload(path, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
-    setUploading(false)
-    if (error) { setUploadError(error.message); return }
-    onUploaded(path)
+    try {
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
+      const { error } = await supabase.storage
+        .from('inbody-photos')
+        .upload(path, decode(base64), { contentType: 'image/jpeg', upsert: false })
+      if (error) {
+        setUploadError(`Couldn't upload the photo: ${error.message}`)
+        return
+      }
+      onUploaded(path)
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const takePhoto = async () => {
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, mediaTypes: ['images'] })
-    if (!result.canceled) await upload(result.assets[0])
+  // Camera/library/file errors must never leave the spinner running.
+  const capture = async (launch: () => Promise<ImagePicker.ImagePickerResult>) => {
+    setUploadError(null)
+    try {
+      const result = await launch()
+      if (!result.canceled) await upload(result.assets[0])
+    } catch (e) {
+      logError('inbody-photo-capture', e)
+      setUploadError("Couldn't take or read the photo. Check permissions and try again.")
+    }
   }
-  const pickPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] })
-    if (!result.canceled) await upload(result.assets[0])
-  }
+  const takePhoto = () => capture(() => ImagePicker.launchCameraAsync({ quality: 0.7, mediaTypes: ['images'] }))
+  const pickPhoto = () => capture(() => ImagePicker.launchImageLibraryAsync({ quality: 0.7, mediaTypes: ['images'] }))
 
   return (
     <View className="mb-4">

@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { View, ActivityIndicator } from 'react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { usePlansStore } from '../../stores/plansStore'
@@ -6,6 +5,7 @@ import { planDays, dayMeals, dayExercises } from '../../lib/utils/plan'
 import { MealPlanDay, WorkoutPlanDay } from '../../types'
 import { Screen, Card, Button, Heading, Text, EmptyState } from '../../components/ui'
 import { useThemeColors } from '../../lib/theme'
+import { useAutoRefresh } from '../../lib/hooks/useAutoRefresh'
 import { UtensilsCrossed, Dumbbell } from 'lucide-react-native'
 
 export default function PlansScreen() {
@@ -13,20 +13,20 @@ export default function PlansScreen() {
   const colors = useThemeColors()
   const { mealPlan, workoutPlan, loading, generating, error, fetchPlans, generateMealPlan, generateWorkoutPlan } = usePlansStore()
 
-  useEffect(() => { if (user) fetchPlans(user.id) }, [user])
+  const { refreshing, onRefresh } = useAutoRefresh(() => (user ? fetchPlans(user.id) : undefined), { enabled: !!user })
 
   const mealDays = planDays<MealPlanDay>(mealPlan?.plan_json ?? null)
   const workoutDays = planDays<WorkoutPlanDay>(workoutPlan?.plan_json ?? null)
 
   return (
-    <Screen title="Plans" scroll>
+    <Screen title="Plans" scroll refreshing={refreshing} onRefresh={onRefresh}>
       {error ? (
         <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
           <Text variant="bodySm" className="text-danger">{error}</Text>
         </View>
       ) : null}
 
-      {loading ? <ActivityIndicator color={colors.primary} className="mb-4" /> : null}
+      {loading && !mealPlan && !workoutPlan ? <ActivityIndicator color={colors.primary} className="mb-4" /> : null}
 
       {/* Meal plan */}
       <View className="mb-6">

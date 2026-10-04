@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { logEvent } from '../lib/telemetry'
 import { sendAgentMessage } from '../lib/api/agent'
@@ -17,6 +19,7 @@ interface PlansState {
 }
 
 export const usePlansStore = create<PlansState>()(
+  persist(
   immer((set, get) => ({
     mealPlan: null,
     workoutPlan: null,
@@ -77,5 +80,7 @@ export const usePlansStore = create<PlansState>()(
         set((s) => { s.error = s.error ?? 'The coach could not generate a workout plan right now. Please try again.' })
       }
     },
-  }))
+  })),
+  cacheOptions<PlansState>('plans', ['mealPlan', 'workoutPlan'])
+  )
 )

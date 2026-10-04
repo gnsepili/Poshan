@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { View } from 'react-native'
 import { useAuthStore } from '../stores/authStore'
 import { useActivityStore } from '../stores/activityStore'
@@ -15,6 +15,7 @@ import {
   Activity as ActivityIcon,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
+import { useAutoRefresh } from '../lib/hooks/useAutoRefresh'
 
 const TYPES: ActivityType[] = ['walk', 'run', 'gym', 'cycle', 'swim', 'yoga', 'other']
 
@@ -39,7 +40,7 @@ export default function ActivityScreen() {
   const [calories, setCalories] = useState('')
   const [notes, setNotes] = useState('')
 
-  useEffect(() => { if (user) fetchTodayActivity(user.id) }, [user])
+  const { refreshing, onRefresh } = useAutoRefresh(() => (user ? fetchTodayActivity(user.id) : undefined), { enabled: !!user })
 
   const handleSave = async () => {
     if (!user) return
@@ -55,7 +56,7 @@ export default function ActivityScreen() {
   }
 
   return (
-    <Screen back title="Log activity" scroll>
+    <Screen back title="Log activity" scroll refreshing={refreshing} onRefresh={onRefresh}>
       {error ? (
         <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-4">
           <Text variant="bodySm" className="text-danger">{error}</Text>

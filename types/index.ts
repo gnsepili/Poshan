@@ -87,6 +87,62 @@ export type ActivityType = 'walk' | 'run' | 'gym' | 'cycle' | 'swim' | 'yoga' | 
 export type ActivitySource = 'manual' | 'health_connect'
 export type PushPlatform = 'android' | 'ios'
 
+export type InBodySegment = 'right_arm' | 'left_arm' | 'trunk' | 'right_leg' | 'left_leg'
+
+export interface InBodySegmentValue {
+  kg: number | null
+  /** % of the ideal amount for this segment, as printed (e.g. 105.3). */
+  pct: number | null
+}
+
+/** Everything read off a full InBody printout (extraction_version 2). null = not printed / unreadable. */
+export interface InBodyDetails {
+  scan_date: string | null
+  device_model: string | null
+  core: {
+    weight_kg: number | null
+    skeletal_muscle_mass_kg: number | null
+    body_fat_mass_kg: number | null
+    percent_body_fat: number | null
+    bmi: number | null
+    visceral_fat_level: number | null
+    bmr_kcal: number | null
+    inbody_score: number | null
+  }
+  body_composition: {
+    total_body_water_l: number | null
+    intracellular_water_l: number | null
+    extracellular_water_l: number | null
+    protein_kg: number | null
+    minerals_kg: number | null
+    bone_mineral_content_kg: number | null
+    fat_free_mass_kg: number | null
+    soft_lean_mass_kg: number | null
+  }
+  segmental_lean: Record<InBodySegment, InBodySegmentValue>
+  segmental_fat: Record<InBodySegment, InBodySegmentValue>
+  ecw_tbw_ratio: number | null
+  research: {
+    waist_hip_ratio: number | null
+    waist_circumference_cm: number | null
+    obesity_degree_pct: number | null
+    smi_kg_m2: number | null
+    phase_angle_deg: number | null
+    body_cell_mass_kg: number | null
+    recommended_calorie_intake_kcal: number | null
+  }
+  weight_control: {
+    target_weight_kg: number | null
+    weight_control_kg: number | null
+    fat_control_kg: number | null
+    muscle_control_kg: number | null
+  }
+  /** Normal ranges printed next to values, keyed by metric (e.g. "weight_kg"). */
+  reference_ranges: { metric: string; low: number | null; high: number | null }[]
+  /** Any other printed label/value pairs not captured above. */
+  other_values: { label: string; value: string }[]
+}
+
 export interface InBodyReport {
   id: string
   user_id: string
@@ -97,6 +153,18 @@ export interface InBodyReport {
   muscle_mass_kg: number | null
   visceral_fat: number | null
   bmr: number | null
+  bmi: number | null
+  body_fat_mass_kg: number | null
+  fat_free_mass_kg: number | null
+  total_body_water_l: number | null
+  ecw_tbw_ratio: number | null
+  inbody_score: number | null
+  smi: number | null
+  phase_angle: number | null
+  waist_hip_ratio: number | null
+  target_weight_kg: number | null
+  /** 1 = legacy 5-field extraction (raw label/value map), 2 = full InBodyDetails. */
+  extraction_version: number
   raw_extracted_json: unknown | null
   ai_notes: string | null
   created_at: string

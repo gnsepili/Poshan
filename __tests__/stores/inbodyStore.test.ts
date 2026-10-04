@@ -34,4 +34,35 @@ describe('inbodyStore', () => {
     expect(result).toBeNull()
     expect(useInbodyStore.getState().error).toBe('insert failed')
   })
+
+  it('keeps reports newest-first when a scan with an older printed date is added', async () => {
+    useInbodyStore.setState({
+      reports: [{ id: 'new', scanned_at: '2026-10-01T12:00:00Z' } as never],
+      latest: { id: 'new', scanned_at: '2026-10-01T12:00:00Z' } as never,
+    })
+    mockInsert({ id: 'old', scanned_at: '2026-09-01T12:00:00Z', ...nullMetrics })
+    await useInbodyStore.getState().addReport({ ...nullMetrics, scanned_at: '2026-09-01T12:00:00Z' })
+    expect(useInbodyStore.getState().reports.map((r) => r.id)).toEqual(['new', 'old'])
+    expect(useInbodyStore.getState().latest?.id).toBe('new')
+  })
+
+  it('updateReport replaces the report in place (re-reading an old scan in full)', async () => {
+    useInbodyStore.setState({
+      reports: [{ id: 'r1', scanned_at: '2026-10-01T12:00:00Z', extraction_version: 1 } as never],
+    })
+    const chain = { update: jest.fn(), eq: jest.fn(), select: jest.fn(), single: jest.fn() }
+    chain.update.mockReturnValue(chain)
+    chain.eq.mockReturnValue(chain)
+    chain.select.mockReturnValue(chain)
+    chain.single.mockResolvedValue({ data: { id: 'r1', scanned_at: '2026-10-01T12:00:00Z', extraction_version: 2, bmi: 31.2 }, error: null })
+    ;(supabase.from as jest.Mock).mockReturnValue(chain)
+
+    const updated = await useInbodyStore.getState().updateReport('r1', { extraction_version: 2, bmi: 31.2 })
+
+    expect(chain.update).toHaveBeenCalledWith({ extraction_version: 2, bmi: 31.2 })
+    expect(chain.eq).toHaveBeenCalledWith('id', 'r1')
+    expect(updated?.extraction_version).toBe(2)
+    expect(useInbodyStore.getState().reports[0].extraction_version).toBe(2)
+    expect(useInbodyStore.getState().latest?.id).toBe('r1')
+  })
 })

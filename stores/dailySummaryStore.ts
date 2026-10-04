@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { persist } from 'zustand/middleware'
+import { cacheOptions } from '../lib/cache'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/database.types'
 import { DailySummary, Goal, Meal } from '../types'
@@ -9,6 +11,8 @@ type DailySummaryInsert = Database['public']['Tables']['daily_summaries']['Inser
 
 interface DailySummaryState {
   summary: DailySummary | null
+  /** The day `summary` belongs to (drops stale cached data after midnight). */
+  summaryDay: string | null
   recent: DailySummary[]
   loading: boolean
   // True once fetchOrCreateToday has settled at least once (success or error) for
@@ -22,8 +26,10 @@ interface DailySummaryState {
 }
 
 export const useDailySummaryStore = create<DailySummaryState>()(
+  persist(
   immer((set) => ({
     summary: null,
+    summaryDay: null,
     recent: [],
     loading: false,
     loaded: false,
@@ -46,7 +52,7 @@ export const useDailySummaryStore = create<DailySummaryState>()(
       }
 
       if (existing) {
-        set((s) => { s.loading = false; s.loaded = true; s.summary = existing as DailySummary })
+        set((s) => { s.loading = false; s.loaded = true; s.summary = existing as DailySummary; s.summaryDay = today })
         return
       }
 
@@ -108,7 +114,10 @@ export const useDailySummaryStore = create<DailySummaryState>()(
       set((s) => {
         s.loading = false
         s.loaded = true
-        s.summary = insertError ? null : (created as DailySummary)
+        if (!insertError) {
+          s.summary = created as DailySummary
+          s.summaryDay = today
+        }
         s.error = insertError?.message ?? null
       })
     },
@@ -126,9 +135,11 @@ export const useDailySummaryStore = create<DailySummaryState>()(
       const rows = ((data ?? []) as DailySummary[]).slice().reverse()
       set((s) => {
         s.loading = false
-        s.recent = error ? [] : rows
+        if (!error) s.recent = rows
         s.error = error?.message ?? null
       })
     },
-  }))
+  })),
+  cacheOptions<DailySummaryState>('dailySummary', ['summary', 'summaryDay', 'recent'], { dayKey: 'summaryDay', dayScoped: ['summary'] })
+  )
 )

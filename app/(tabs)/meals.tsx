@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { View, ScrollView, Modal, ActivityIndicator } from 'react-native'
+import { useState } from 'react'
+import { View, ScrollView, Modal, ActivityIndicator, RefreshControl } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNetInfo } from '@react-native-community/netinfo'
 import { Plus, X, UtensilsCrossed } from 'lucide-react-native'
@@ -12,6 +12,7 @@ import { parseManualMacros } from '../../lib/utils/manualMealEntry'
 import { MealType } from '../../types'
 import { Screen, Heading, Text, Button, IconButton, Input, Chip, EmptyState } from '../../components/ui'
 import { useThemeColors } from '../../lib/theme'
+import { useAutoRefresh } from '../../lib/hooks/useAutoRefresh'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -25,7 +26,7 @@ const FAB_SHADOW = {
 
 export default function MealsScreen() {
   const { user } = useAuthStore()
-  const { meals, fetchTodayMeals, addMeal, loading, pendingCount } = useMealsStore()
+  const { meals, fetchTodayMeals, addMeal, loading, error, pendingCount } = useMealsStore()
   const netInfo = useNetInfo()
   const isOffline = netInfo.isConnected === false
   const colors = useThemeColors()
@@ -44,9 +45,7 @@ export default function MealsScreen() {
   const [manualError, setManualError] = useState<string | null>(null)
   const [savingOffline, setSavingOffline] = useState(false)
 
-  useEffect(() => {
-    if (user) fetchTodayMeals(user.id)
-  }, [user])
+  const { refreshing, onRefresh } = useAutoRefresh(() => (user ? fetchTodayMeals(user.id) : undefined), { enabled: !!user })
 
   const resetForm = () => {
     setPhotoUrl(null)
@@ -66,7 +65,7 @@ export default function MealsScreen() {
     setAnalysisError(null)
     try {
       const analysis = await analyzeMealPhoto(photoUrl, description)
-      await addMeal({
+      const result = await addMeal({
         user_id: user.id,
         meal_type: mealType,
         description,
@@ -78,6 +77,10 @@ export default function MealsScreen() {
         fiber_g: analysis.fiber_g,
         ai_suggestions: analysis.suggestions ?? null,
       })
+      if (result.status === 'failed') {
+        setAnalysisError(result.error)
+        return
+      }
       setModalOpen(false)
       resetForm()
     } catch (err) {
@@ -106,15 +109,21 @@ export default function MealsScreen() {
     setManualError(null)
     setSavingOffline(true)
     try {
-      await addMeal({
+      const result = await addMeal({
         user_id: user.id,
         meal_type: mealType,
         description,
         ...macros,
         ai_suggestions: null,
       })
+      if (result.status === 'failed') {
+        setManualError(result.error)
+        return
+      }
       setModalOpen(false)
       resetForm()
+    } catch (err) {
+      setManualError(err instanceof Error ? err.message : 'Could not save the meal.')
     } finally {
       setSavingOffline(false)
     }
@@ -132,8 +141,16 @@ export default function MealsScreen() {
         </View>
       ) : null}
 
+      {error && !modalOpen ? (
+        <View className="bg-danger-soft rounded-2xl px-4 py-3 mb-3">
+          <Text variant="bodySm" className="text-danger">
+            {error}
+          </Text>
+        </View>
+      ) : null}
+
       <View className="flex-1">
-        {loading ? (
+        {loading && meals.length === 0 ? (
           <ActivityIndicator className="mt-8" color={colors.primary} />
         ) : meals.length === 0 ? (
           <EmptyState
@@ -142,7 +159,13 @@ export default function MealsScreen() {
             description="Tap the + button to log your first meal of the day."
           />
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 96 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 96 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+            }
+          >
             <View className="gap-3">
               {meals.map((m) => (
                 <MealCard key={m.id} meal={m} />

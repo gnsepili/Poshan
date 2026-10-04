@@ -33,6 +33,7 @@ import { useThemeColors } from '../../lib/theme'
 import { calcProgress, sumMeals } from '../../lib/utils/macros'
 import { sumSteps } from '../../lib/utils/activity'
 import { generateDailySummary } from '../../lib/api/dailySummary'
+import { useAutoRefresh } from '../../lib/hooks/useAutoRefresh'
 import { shouldGenerateAfterLoad, shouldShowLowFuelPrompt } from '../../lib/utils/coachNote'
 import type { LucideIcon } from 'lucide-react-native'
 
@@ -57,14 +58,19 @@ export default function HomeScreen() {
   const { available: hcAvailable, permissionGranted: hcGranted, todaySteps: hcSteps, checkAvailability, syncNow } = useHealthConnectStore()
   const [lazyError, setLazyError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (user) {
-      fetchTodayMeals(user.id)
-      fetchGoals(user.id)
-      fetchOrCreateToday(user.id)
-      fetchTodayActivity(user.id)
-    }
-  }, [user])
+  const { refreshing, onRefresh } = useAutoRefresh(
+    () =>
+      user
+        ? Promise.all([
+            fetchTodayMeals(user.id),
+            fetchGoals(user.id),
+            fetchOrCreateToday(user.id),
+            fetchTodayActivity(user.id),
+            hcAvailable && hcGranted ? syncNow(user.id) : undefined,
+          ])
+        : undefined,
+    { enabled: !!user }
+  )
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0]
@@ -92,7 +98,7 @@ export default function HomeScreen() {
   const errorMessage = mealsError ?? profileError ?? summaryError ?? activityError ?? lazyError
 
   return (
-    <Screen scroll>
+    <Screen scroll refreshing={refreshing} onRefresh={onRefresh}>
       {/* Greeting */}
       <View className="mt-1 mb-5">
         <Text variant="caption" muted className="uppercase tracking-wide">
