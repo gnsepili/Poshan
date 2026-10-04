@@ -9,13 +9,42 @@ import { ChatMessage, ChatRole } from '../types'
 
 type ChatHistoryMessage = Omit<ChatMessage, 'user_id' | 'tool_calls' | 'context_snapshot'>
 
+export interface ConversationSummary {
+  id: string
+  title: string
+  updated_at: string
+}
+
+const MESSAGE_LIMIT = 50
+
+// Latest messages of a thread (newest-first from the DB), shown oldest-first.
+async function loadThreadMessages(conversationId: string) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(MESSAGE_LIMIT)
+  const messages: ChatHistoryMessage[] = (data ?? [])
+    .slice()
+    .reverse()
+    .map((m) => ({ id: m.id, conversation_id: m.conversation_id, role: m.role as ChatRole, content: m.content, created_at: m.created_at }))
+  return { messages, error }
+}
+
 interface ChatState {
   messages: ChatHistoryMessage[]
   conversationId: string | null
+  conversations: ConversationSummary[]
   loading: boolean
   error: string | null
   sendMessage: (content: string) => Promise<void>
   loadHistory: (userId: string) => Promise<void>
+  fetchConversations: (userId: string) => Promise<void>
+  openConversation: (id: string) => Promise<void>
+  startNewConversation: () => void
+  /** Resolves false (and sets `error`) if the delete failed. */
+  deleteConversation: (id: string) => Promise<boolean>
 }
 
 export const useChatStore = create<ChatState>()(
@@ -23,6 +52,7 @@ export const useChatStore = create<ChatState>()(
   immer((set, get) => ({
     messages: [],
     conversationId: null,
+    conversations: [],
     loading: false,
     error: null,
 
@@ -40,18 +70,28 @@ export const useChatStore = create<ChatState>()(
         s.error = null
       })
       try {
-        const { reply, conversation_id } = await sendAgentMessage(content, get().conversationId ?? undefined)
+        const { reply, conversation_id, title } = await sendAgentMessage(content, get().conversationId ?? undefined)
+        const threadId = conversation_id ?? get().conversationId ?? ''
+        const now = new Date().toISOString()
         const assistantMsg: ChatHistoryMessage = {
           id: randomUUID(),
-          conversation_id,
+          conversation_id: threadId,
           role: 'assistant',
           content: reply,
-          created_at: new Date().toISOString(),
+          created_at: now,
         }
         set((s) => {
           s.messages.push(assistantMsg)
-          s.conversationId = conversation_id
+          s.conversationId = threadId || null
           s.loading = false
+          // Keep the thread list fresh: move this thread to the top (adding it if new).
+          if (threadId) {
+            const existing = s.conversations.find((c) => c.id === threadId)
+            s.conversations = [
+              { id: threadId, title: existing?.title ?? title ?? content.slice(0, 50), updated_at: now },
+              ...s.conversations.filter((c) => c.id !== threadId),
+            ]
+          }
         })
       } catch (e) {
         // Drop the optimistic message: the screen puts the text back in the input,
@@ -62,6 +102,61 @@ export const useChatStore = create<ChatState>()(
           s.error = e instanceof Error ? e.message : String(e)
         })
       }
+    },
+
+    fetchConversations: async (userId) => {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, title, updated_at')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+        .limit(100)
+      set((s) => {
+        if (!error && data) s.conversations = data as ConversationSummary[]
+        else if (error) s.error = error.message
+      })
+    },
+
+    openConversation: async (id) => {
+      set((s) => {
+        s.loading = true
+        s.error = null
+        s.conversationId = id
+        s.messages = []
+      })
+      const { messages, error } = await loadThreadMessages(id)
+      set((s) => {
+        s.loading = false
+        s.error = error?.message ?? null
+        if (!error) s.messages = messages
+      })
+    },
+
+    startNewConversation: () => {
+      set((s) => {
+        s.messages = []
+        s.conversationId = null
+        s.error = null
+      })
+    },
+
+    deleteConversation: async (id) => {
+      // Messages are removed with the thread (FK on delete cascade).
+      const { error } = await supabase.from('conversations').delete().eq('id', id)
+      if (error) {
+        set((s) => {
+          s.error = error.message
+        })
+        return false
+      }
+      set((s) => {
+        s.conversations = s.conversations.filter((c) => c.id !== id)
+        if (s.conversationId === id) {
+          s.conversationId = null
+          s.messages = []
+        }
+      })
+      return true
     },
 
     loadHistory: async (userId) => {
@@ -121,6 +216,6 @@ export const useChatStore = create<ChatState>()(
       })
     },
   })),
-  cacheOptions<ChatState>('chat', ['messages', 'conversationId'])
+  cacheOptions<ChatState>('chat', ['messages', 'conversationId', 'conversations'])
   )
 )

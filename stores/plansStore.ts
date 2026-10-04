@@ -51,7 +51,11 @@ export const usePlansStore = create<PlansState>()(
       set((s) => { s.generating = true; s.error = null })
       try {
         // Reuse ai-agent; its generate_meal_plan tool persists the row (no new edge fn).
-        await sendAgentMessage('Generate a new 7-day meal plan aligned to my current calorie and macro goals, and save it with the generate_meal_plan tool.')
+        await sendAgentMessage(
+          'Generate a new 7-day meal plan aligned to my current calorie and macro goals, and save it with the generate_meal_plan tool.',
+          undefined,
+          { persist: false }
+        )
       } catch (e) {
         set((s) => { s.generating = false; s.error = e instanceof Error ? e.message : String(e) })
         return

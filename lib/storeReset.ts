@@ -20,7 +20,7 @@ export async function resetAllStores(): Promise<void> {
   usePlansStore.setState({ mealPlan: null, workoutPlan: null, loading: false, generating: false, error: null })
   useProfileStore.setState({ profile: null, goals: null, loading: false, error: null })
   useInbodyStore.setState({ reports: [], latest: null, loading: false, error: null })
-  useChatStore.setState({ messages: [], conversationId: null, loading: false, error: null })
+  useChatStore.setState({ messages: [], conversationId: null, conversations: [], loading: false, error: null })
   usePushStore.setState({ token: null, permissionGranted: false, registering: false, error: null })
   useHealthConnectStore.setState({
     available: null,

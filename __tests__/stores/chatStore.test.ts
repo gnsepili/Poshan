@@ -44,7 +44,7 @@ const mockChatHistory = (
 
 describe('chatStore', () => {
   beforeEach(() => {
-    useChatStore.setState({ messages: [], conversationId: null, loading: false, error: null })
+    useChatStore.setState({ messages: [], conversationId: null, conversations: [], loading: false, error: null })
     ;(sendAgentMessage as jest.Mock).mockReset()
     ;(supabase.from as jest.Mock).mockReset()
   })
@@ -136,5 +136,62 @@ describe('chatStore', () => {
     expect(useChatStore.getState().messages).toHaveLength(0)
     expect(useChatStore.getState().loading).toBe(false)
     expect(useChatStore.getState().error).toBe('messages fetch failed')
+  })
+
+  describe('threads', () => {
+    const chain = (result: unknown) => {
+      const c: Record<string, jest.Mock> = {}
+      for (const k of ['select', 'eq', 'order', 'limit', 'delete']) c[k] = jest.fn(() => c)
+      ;(c as unknown as { then: unknown }).then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve)
+      return c
+    }
+
+    it('startNewConversation clears the current thread', () => {
+      useChatStore.setState({ messages: [{ id: 'x' }] as never, conversationId: 'conv-1', error: 'old' })
+      useChatStore.getState().startNewConversation()
+      expect(useChatStore.getState().messages).toHaveLength(0)
+      expect(useChatStore.getState().conversationId).toBeNull()
+      expect(useChatStore.getState().error).toBeNull()
+    })
+
+    it('a first reply in a new thread adds it to the top of the thread list', async () => {
+      useChatStore.setState({ conversations: [{ id: 'old', title: 'Old', updated_at: '2026-10-01T00:00:00Z' }] })
+      ;(sendAgentMessage as jest.Mock).mockResolvedValue({ reply: 'Hey', conversation_id: 'conv-new', title: 'Plan my week' })
+      await useChatStore.getState().sendMessage('Plan my week')
+      const list = useChatStore.getState().conversations
+      expect(list[0]).toMatchObject({ id: 'conv-new', title: 'Plan my week' })
+      expect(list).toHaveLength(2)
+    })
+
+    it('fetchConversations loads the user\'s threads, most recent first', async () => {
+      const rows = [{ id: 'c2', title: 'B', updated_at: '2026-10-04T00:00:00Z' }]
+      const c = chain({ data: rows, error: null })
+      ;(supabase.from as jest.Mock).mockReturnValue(c)
+      await useChatStore.getState().fetchConversations('user-1')
+      expect(supabase.from).toHaveBeenCalledWith('conversations')
+      expect(c.eq).toHaveBeenCalledWith('user_id', 'user-1')
+      expect(c.order).toHaveBeenCalledWith('updated_at', { ascending: false })
+      expect(useChatStore.getState().conversations).toEqual(rows)
+    })
+
+    it('openConversation loads that thread\'s latest messages', async () => {
+      const c = chain({ data: [{ id: 'm2', conversation_id: 'c1', role: 'assistant', content: 'B', created_at: 't2' }, { id: 'm1', conversation_id: 'c1', role: 'user', content: 'A', created_at: 't1' }], error: null })
+      ;(supabase.from as jest.Mock).mockReturnValue(c)
+      await useChatStore.getState().openConversation('c1')
+      expect(c.eq).toHaveBeenCalledWith('conversation_id', 'c1')
+      expect(useChatStore.getState().conversationId).toBe('c1')
+      expect(useChatStore.getState().messages.map((m) => m.content)).toEqual(['A', 'B'])
+    })
+
+    it('deleteConversation removes the thread and resets the chat if it was open', async () => {
+      useChatStore.setState({ conversationId: 'c1', messages: [{ id: 'm' }] as never, conversations: [{ id: 'c1', title: 'A', updated_at: 't' }, { id: 'c2', title: 'B', updated_at: 't' }] })
+      const c = chain({ error: null })
+      ;(supabase.from as jest.Mock).mockReturnValue(c)
+      await expect(useChatStore.getState().deleteConversation('c1')).resolves.toBe(true)
+      expect(c.eq).toHaveBeenCalledWith('id', 'c1')
+      expect(useChatStore.getState().conversations.map((t) => t.id)).toEqual(['c2'])
+      expect(useChatStore.getState().conversationId).toBeNull()
+      expect(useChatStore.getState().messages).toHaveLength(0)
+    })
   })
 })

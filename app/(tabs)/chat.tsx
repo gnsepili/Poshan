@@ -2,24 +2,30 @@ import { useEffect, useRef, useState } from 'react'
 import { View, FlatList, ActivityIndicator } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MessageCircle } from 'lucide-react-native'
+import { History, MessageCircle, SquarePen } from 'lucide-react-native'
+import { useRouter } from 'expo-router'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatStore } from '../../stores/chatStore'
 import { ChatMessage } from '../../components/chat/ChatMessage'
 import { ChatInput } from '../../components/chat/ChatInput'
-import { Heading, Text, EmptyState } from '../../components/ui'
+import { Heading, Text, EmptyState, IconButton } from '../../components/ui'
 import { useThemeColors } from '../../lib/theme'
 
 export default function ChatScreen() {
   const { user } = useAuthStore()
-  const { messages, loading, error, sendMessage, loadHistory } = useChatStore()
+  const router = useRouter()
+  const { messages, loading, error, sendMessage, loadHistory, conversationId, conversations, fetchConversations, startNewConversation } =
+    useChatStore()
+  const threadTitle = conversations.find((c) => c.id === conversationId)?.title
   const [input, setInput] = useState('')
   const listRef = useRef<FlatList>(null)
   const insets = useSafeAreaInsets()
   const colors = useThemeColors()
 
   useEffect(() => {
-    if (user) loadHistory(user.id)
+    if (!user) return
+    loadHistory(user.id)
+    fetchConversations(user.id)
   }, [user])
 
   const handleSend = async () => {
@@ -36,13 +42,17 @@ export default function ChatScreen() {
     // KeyboardAvoidingView leaves the input behind the keyboard.
     <View className="flex-1 bg-background">
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-      <View className="px-5 pb-3 border-b border-border" style={{ paddingTop: insets.top + 8 }}>
-        <Heading level={3} uppercase>
-          Coach
-        </Heading>
-        <Text variant="bodySm" muted>
-          Your AI health coach
-        </Text>
+      <View className="px-5 pb-3 border-b border-border flex-row items-center gap-2" style={{ paddingTop: insets.top + 8 }}>
+        <View className="flex-1">
+          <Heading level={3} uppercase>
+            Coach
+          </Heading>
+          <Text variant="bodySm" muted numberOfLines={1}>
+            {conversationId ? threadTitle ?? 'Your AI health coach' : 'New chat'}
+          </Text>
+        </View>
+        <IconButton icon={History} accessibilityLabel="Chat history" variant="ghost" onPress={() => router.push('/coach/threads')} />
+        <IconButton icon={SquarePen} accessibilityLabel="New chat" variant="ghost" onPress={startNewConversation} />
       </View>
 
       {messages.length === 0 ? (

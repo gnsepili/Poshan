@@ -13,6 +13,15 @@ const REQUEST_BUDGET_MS = 75_000
 const PER_CALL_TIMEOUT_MS = 40_000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Thread title from its first message: whitespace collapsed, cut at a word near 50 chars.
+function threadTitle(message: string): string {
+  const flat = message.replace(/\s+/g, ' ').trim()
+  if (flat.length <= 50) return flat
+  const cut = flat.slice(0, 50)
+  const space = cut.lastIndexOf(' ')
+  return `${space > 30 ? cut.slice(0, space) : cut}…`
+}
+
 // Coaching principles adapted (content only, not its file-storage mechanics) from the
 // MIT-licensed NataMoroz/nutrition-coach skill: https://github.com/NataMoroz/nutrition-coach
 const COACHING_PRINCIPLES = `
@@ -43,23 +52,39 @@ Deno.serve(async (req) => {
     const message = typeof body.message === 'string' ? body.message.trim() : ''
     if (!message) throw new HttpError(400, 'Please type a message first.')
     if (message.length > MAX_MESSAGE) throw new HttpError(400, `Messages can be up to ${MAX_MESSAGE} characters.`)
-    const requestedConv = typeof body.conversation_id === 'string' ? body.conversation_id : ''
-    const convId = UUID_RE.test(requestedConv) ? requestedConv : crypto.randomUUID()
+    // persist:false = a one-off request (e.g. "generate my meal plan") that must not create
+    // a chat thread or carry history.
+    const persist = body.persist !== false
 
     const supabase = serviceClient()
     await enforceAiQuota(supabase, userId)
 
-    // Most recent turns of THIS user's conversation (filtered by user_id too, so a
-    // conversation id from someone else never exposes their messages).
-    const { data: recent, error: historyErr } = await supabase
-      .from('chat_messages')
-      .select('role, content')
-      .eq('conversation_id', convId)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(HISTORY_LIMIT)
-    if (historyErr) throw new Error(`chat history read failed: ${historyErr.message}`)
-    const history = ((recent ?? []) as { role: string; content: string }[]).reverse()
+    // Continue the caller's own thread, or start a new one (a thread id that doesn't exist or
+    // belongs to someone else always starts fresh — never exposes another user's messages).
+    const requestedConv = typeof body.conversation_id === 'string' && UUID_RE.test(body.conversation_id) ? body.conversation_id : ''
+    let convId: string = crypto.randomUUID()
+    let isNewThread = true
+    if (persist && requestedConv) {
+      const { data: existing, error: convErr } = await supabase.from('conversations').select('user_id').eq('id', requestedConv).maybeSingle()
+      if (convErr) throw new Error(`conversation lookup failed: ${convErr.message}`)
+      if (existing && existing.user_id === userId) {
+        convId = requestedConv
+        isNewThread = false
+      }
+    }
+
+    let history: { role: string; content: string }[] = []
+    if (!isNewThread) {
+      const { data: recent, error: historyErr } = await supabase
+        .from('chat_messages')
+        .select('role, content')
+        .eq('conversation_id', convId)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_LIMIT)
+      if (historyErr) throw new Error(`chat history read failed: ${historyErr.message}`)
+      history = ((recent ?? []) as { role: string; content: string }[]).reverse()
+    }
 
     const systemContext = await assembleContext(userId, supabase)
 
@@ -109,16 +134,26 @@ Deno.serve(async (req) => {
 
     if (!reply) reply = "I processed that, but I don't have anything else to add."
 
-    // Persist the turn only once it succeeded, so a failed send (which the app lets the
-    // user retry) never leaves an orphan user message in the history.
-    const now = Date.now()
-    const { error: saveErr } = await supabase.from('chat_messages').insert([
-      { user_id: userId, conversation_id: convId, role: 'user', content: message, created_at: new Date(now).toISOString() },
-      { user_id: userId, conversation_id: convId, role: 'assistant', content: reply, created_at: new Date(now + 1).toISOString() },
-    ])
-    if (saveErr) await logEdgeError(supabase, 'ai-agent:save-turn', new Error(saveErr.message), userId)
+    if (!persist) return json({ reply, conversation_id: null })
 
-    return json({ reply, conversation_id: convId })
+    // Persist the turn only once it succeeded, so a failed send (which the app lets the
+    // user retry) never leaves an orphan message or an empty thread behind.
+    const now = Date.now()
+    const title = isNewThread ? threadTitle(message) : undefined
+    const { error: threadErr } = isNewThread
+      ? await supabase.from('conversations').insert({ id: convId, user_id: userId, title })
+      : await supabase.from('conversations').update({ updated_at: new Date(now).toISOString() }).eq('id', convId)
+    if (threadErr) {
+      await logEdgeError(supabase, 'ai-agent:save-thread', new Error(threadErr.message), userId)
+    } else {
+      const { error: saveErr } = await supabase.from('chat_messages').insert([
+        { user_id: userId, conversation_id: convId, role: 'user', content: message, created_at: new Date(now).toISOString() },
+        { user_id: userId, conversation_id: convId, role: 'assistant', content: reply, created_at: new Date(now + 1).toISOString() },
+      ])
+      if (saveErr) await logEdgeError(supabase, 'ai-agent:save-turn', new Error(saveErr.message), userId)
+    }
+
+    return json({ reply, conversation_id: convId, title: title ?? null })
   } catch (e) {
     return await errorResponse('ai-agent', e, userId)
   }

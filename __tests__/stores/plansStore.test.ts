@@ -44,7 +44,8 @@ describe('plansStore', () => {
     ;(sendAgentMessage as jest.Mock).mockResolvedValue({ reply: 'done', conversation_id: 'c1' })
     ;(supabase.from as jest.Mock).mockImplementation(() => makeLatestChain({ data: null, error: null }))
     await usePlansStore.getState().generateMealPlan('u1')
-    expect(sendAgentMessage).toHaveBeenCalledWith(expect.stringContaining('meal plan'))
+    // One-off request: must not create a coach chat thread.
+    expect(sendAgentMessage).toHaveBeenCalledWith(expect.stringContaining('meal plan'), undefined, { persist: false })
     expect(supabase.from).toHaveBeenCalledWith('meal_plans')
     expect(usePlansStore.getState().generating).toBe(false)
   })
