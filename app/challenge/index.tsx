@@ -161,10 +161,56 @@ function Heatmap({ start, end, days, today }: { start: string; end: string; days
       {cells.map((d) => {
         const v = days.get(d)
         const ratio = v && v.total ? v.done / v.total : 0
-        const future = d > today
-        const bg = future ? '#141416' : ratio === 0 ? '#1F1F22' : ratio < 0.5 ? '#123447' : ratio < 1 ? '#2A6F93' : colors.arc
-        return <View key={d} style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: bg, borderWidth: d === today ? 1.5 : 0, borderColor: '#F5F5F5' }} />
+        return <View key={d} style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: heatColor(d, today, ratio, colors.arc), borderWidth: d === today ? 1.5 : 0, borderColor: '#F5F5F5' }} />
       })}
+    </View>
+  )
+}
+
+const HEAT = { upcoming: '#2A2A2E', missed: '#4A1F24', some: '#1E4A63' }
+
+// Upcoming days stay visible (so the whole arc's length shows), missed days read as misses.
+function heatColor(date: string, today: string, ratio: number, full: string): string {
+  if (date > today) return HEAT.upcoming
+  if (ratio >= 1) return full
+  if (ratio === 0) return date === today ? HEAT.upcoming : HEAT.missed
+  return ratio < 0.5 ? HEAT.some : '#2A7DA8'
+}
+
+function HeatLegend() {
+  const colors = useThemeColors()
+  const items: [string, string][] = [
+    [colors.arc, 'All done'],
+    ['#2A7DA8', 'Most'],
+    [HEAT.missed, 'Missed'],
+    [HEAT.upcoming, 'Upcoming'],
+  ]
+  return (
+    <View className="flex-row flex-wrap gap-x-3 gap-y-1 mt-3">
+      {items.map(([c, label]) => (
+        <View key={label} className="flex-row items-center gap-1.5">
+          <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c }} />
+          <Text variant="caption" muted>{label}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
+
+// "94.2 kg  −1.4" — current value with the change since the arc started (down is good).
+function Delta({ label, from, to, unit }: { label: string; from: number; to: number | null; unit: string }) {
+  const colors = useThemeColors()
+  const change = to === null ? null : Math.round((to - from) * 10) / 10
+  return (
+    <View className="flex-1 bg-surface-muted rounded-2xl p-3">
+      <Text variant="caption" muted>{label}</Text>
+      <Text className="font-display text-2xl text-foreground">
+        {to ?? from}
+        <Text className="font-display text-base text-foreground"> {unit}</Text>
+      </Text>
+      <Text variant="caption" style={{ color: change === null || change === 0 ? colors.mutedForeground : change < 0 ? colors.success : colors.warning }}>
+        {change === null ? `Start ${from}${unit === '%' ? '%' : ` ${unit}`} · scan to update` : change === 0 ? `No change since day 1` : `${change > 0 ? '+' : '−'}${Math.abs(change)} ${unit} since day 1`}
+      </Text>
     </View>
   )
 }
@@ -272,26 +318,15 @@ function ArcDashboard() {
           <Text variant="caption" muted>{s.completionPct}% of rules hit</Text>
         </View>
         <Heatmap start={challenge.start_date} end={challenge.end_date} days={dayMap} today={today} />
+        <HeatLegend />
       </FadeIn>
 
       {challenge.start_weight_kg ? (
         <FadeIn index={4} className="bg-surface rounded-3xl p-4 mb-5">
           <Text variant="caption" muted className="uppercase tracking-wide mb-2">Start vs now</Text>
           <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Text variant="caption" muted>Weight</Text>
-              <Text className="font-display text-2xl text-foreground">
-                {challenge.start_weight_kg} → {nowWeight ?? '—'} kg
-              </Text>
-            </View>
-            {challenge.start_body_fat_pct ? (
-              <View className="flex-1">
-                <Text variant="caption" muted>Body fat</Text>
-                <Text className="font-display text-2xl text-foreground">
-                  {challenge.start_body_fat_pct}% → {nowFat !== null ? `${nowFat}%` : '—'}
-                </Text>
-              </View>
-            ) : null}
+            <Delta label="Weight" from={challenge.start_weight_kg} to={nowWeight} unit="kg" />
+            {challenge.start_body_fat_pct ? <Delta label="Body fat" from={challenge.start_body_fat_pct} to={nowFat} unit="%" /> : null}
           </View>
           <Text variant="caption" muted className="mt-2">Scan your InBody every couple of weeks to keep this honest.</Text>
         </FadeIn>
