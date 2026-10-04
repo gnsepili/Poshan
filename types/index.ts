@@ -31,6 +31,9 @@ export interface Goal {
   daily_fat_g: number
   daily_steps_target: number
   notes: string
+  /** Set by the coach-style goal setup; null for older goals. */
+  goal_type: 'lose' | 'maintain' | 'gain' | null
+  weekly_rate_kg: number | null
   created_at: string
 }
 

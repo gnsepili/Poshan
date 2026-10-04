@@ -226,12 +226,14 @@ export type Database = {
           daily_fat_g: number
           daily_protein_g: number
           daily_steps_target: number
+          goal_type: string | null
           id: string
           notes: string
           target_body_fat_pct: number | null
           target_muscle_mass_kg: number | null
           target_weight_kg: number
           user_id: string
+          weekly_rate_kg: number | null
         }
         Insert: {
           created_at?: string
@@ -240,12 +242,14 @@ export type Database = {
           daily_fat_g: number
           daily_protein_g: number
           daily_steps_target?: number
+          goal_type?: string | null
           id?: string
           notes?: string
           target_body_fat_pct?: number | null
           target_muscle_mass_kg?: number | null
           target_weight_kg: number
           user_id: string
+          weekly_rate_kg?: number | null
         }
         Update: {
           created_at?: string
@@ -254,12 +258,14 @@ export type Database = {
           daily_fat_g?: number
           daily_protein_g?: number
           daily_steps_target?: number
+          goal_type?: string | null
           id?: string
           notes?: string
           target_body_fat_pct?: number | null
           target_muscle_mass_kg?: number | null
           target_weight_kg?: number
           user_id?: string
+          weekly_rate_kg?: number | null
         }
         Relationships: []
       }
