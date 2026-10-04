@@ -1,13 +1,12 @@
 import { useState } from 'react'
-import { View } from 'react-native'
+import { Image, View } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
-import { Mail, Lock, Eye, EyeOff, Leaf } from 'lucide-react-native'
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton'
 import { Button, Input, Heading, Text } from '../../components/ui'
-import { useThemeColors } from '../../lib/theme'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -15,7 +14,6 @@ export default function LoginScreen() {
   const [show, setShow] = useState(false)
   const { signIn, loading, error } = useAuthStore()
   const insets = useSafeAreaInsets()
-  const colors = useThemeColors()
 
   return (
     <View className="flex-1 bg-background">
@@ -26,9 +24,11 @@ export default function LoginScreen() {
       >
         {/* Brand */}
         <View className="items-center mb-10">
-          <View className="h-16 w-16 rounded-3xl bg-primary items-center justify-center mb-4">
-            <Leaf size={30} color={colors.onPrimary} />
-          </View>
+          <Image
+            source={require('../../assets/brand-mark.png')}
+            className="h-20 w-20 rounded-3xl mb-4"
+            accessibilityLabel="Poshan AI logo"
+          />
           <Heading level={1} uppercase>Poshan AI</Heading>
           <Text variant="body" muted>Your AI health coach</Text>
         </View>
