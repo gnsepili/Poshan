@@ -1,4 +1,4 @@
-import { MealType } from '../../types'
+import { MealItem, MealType } from '../../types'
 
 export interface QueuedMeal {
   id: string // client-generated uuid — the meals.id too, so a re-insert collides (idempotent)
@@ -16,6 +16,9 @@ export interface QueuedMeal {
   // on the next flush; it reuses this already-uploaded remote URL instead.
   photo_url?: string
   ai_suggestions?: string | null
+  items?: MealItem[] | null
+  score?: number | null
+  score_label?: string | null
   queued_at: string
 }
 

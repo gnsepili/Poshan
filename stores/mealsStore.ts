@@ -59,11 +59,16 @@ interface MealsState {
   loadPendingCount: () => Promise<void>
   flushQueue: () => Promise<void>
   addMeal: (
-    meal: Omit<Meal, 'id' | 'created_at' | 'logged_at' | 'ai_suggestions' | 'photo_url'> & {
+    meal: Omit<Meal, 'id' | 'created_at' | 'logged_at' | 'ai_suggestions' | 'photo_url' | 'items' | 'score' | 'score_label'> & {
       photo_url?: string
       ai_suggestions?: string | null
+      items?: Meal['items']
+      score?: number | null
+      score_label?: string | null
     }
   ) => Promise<AddMealResult>
+  /** Resolves false (and sets `error`) if the delete failed. */
+  deleteMeal: (id: string) => Promise<boolean>
 }
 
 export const useMealsStore = create<MealsState>()(
@@ -157,6 +162,9 @@ export const useMealsStore = create<MealsState>()(
           photo_local_uri: meal.photo_url?.startsWith('file:') ? meal.photo_url : undefined,
           photo_url: meal.photo_url && !meal.photo_url.startsWith('file:') ? meal.photo_url : undefined,
           ai_suggestions: meal.ai_suggestions ?? null,
+          items: meal.items ?? null,
+          score: meal.score ?? null,
+          score_label: meal.score_label ?? null,
           queued_at: loggedAt,
         }
         try {
@@ -177,6 +185,15 @@ export const useMealsStore = create<MealsState>()(
         s.error = message
       })
       return { status: 'failed', error: message }
+    },
+
+    deleteMeal: async (id) => {
+      const { error } = await supabase.from('meals').delete().eq('id', id)
+      set((s) => {
+        if (error) s.error = error.message
+        else s.meals = s.meals.filter((m) => m.id !== id)
+      })
+      return !error
     },
 
     flushQueue: async () => {
@@ -222,6 +239,9 @@ export const useMealsStore = create<MealsState>()(
               fiber_g: item.fiber_g,
               photo_url: photo_url ?? null,
               ai_suggestions: item.ai_suggestions ?? null,
+              items: item.items ?? null,
+              score: item.score ?? null,
+              score_label: item.score_label ?? null,
               logged_at: item.queued_at,
             } as unknown as MealInsert)
             // Duplicate PK => this meal was already inserted by an earlier flaky flush: done, not an error.

@@ -3,6 +3,33 @@ import { CORS, HttpError, enforceAiQuota, errorResponse, json, readJsonBody, req
 
 const MAX_DESCRIPTION = 300
 
+const num = { type: 'number' }
+const MEAL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['title', 'items', 'total_calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'score', 'score_label', 'suggestions'],
+  properties: {
+    title: { type: 'string' },
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'portion', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+        properties: { name: { type: 'string' }, portion: { type: 'string' }, calories: num, protein_g: num, carbs_g: num, fat_g: num },
+      },
+    },
+    total_calories: num,
+    protein_g: num,
+    carbs_g: num,
+    fat_g: num,
+    fiber_g: num,
+    score: num,
+    score_label: { type: 'string' },
+    suggestions: { type: 'string' },
+  },
+}
+
 // Model output is untrusted: coerce every macro to a finite, non-negative number.
 function macro(v: unknown): number {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN
@@ -32,21 +59,15 @@ Deno.serve(async (req) => {
       throw new HttpError(400, "We couldn't read that photo. Please retake it and try again.")
     }
 
-    const prompt = `Analyse this meal photo${description ? ` (the user describes it as: ${JSON.stringify(description)})` : ''}. Estimate the nutrition. Respond with ONLY a JSON object, no markdown, with exactly these fields:
-{
-  "items": ["item1", "item2"],
-  "total_calories": number,
-  "protein_g": number,
-  "carbs_g": number,
-  "fat_g": number,
-  "fiber_g": number,
-  "suggestions": "one short sentence with a healthier suggestion"
-}
-Be realistic but slightly conservative with estimates.`
+    const prompt = `Analyse this meal photo${description ? ` (the user describes it as: ${JSON.stringify(description)})` : ''}. Identify each food item and estimate its portion and nutrition, then total them.
+Rules: be realistic but slightly conservative; totals must equal the sum of the items; Indian home-style dishes are common.
+"title": a short name for the whole meal (2-5 words).
+"score": 1-10 for how well this meal supports a healthy, protein-forward diet (10 = excellent), and "score_label": 2-3 words explaining it (e.g. "High protein", "Carb heavy", "Balanced").
+"suggestions": one short, specific, encouraging sentence on how to improve this meal.`
 
     const data = await chatCompletion(supabase, 'meal_analysis', {
-      max_completion_tokens: 512,
-      response_format: { type: 'json_object' },
+      max_completion_tokens: 900,
+      response_format: { type: 'json_schema', json_schema: { name: 'meal_analysis', strict: true, schema: MEAL_SCHEMA } },
       messages: [
         {
           role: 'user',
@@ -61,13 +82,31 @@ Be realistic but slightly conservative with estimates.`
     const parsed = parseModelJson(data.choices?.[0]?.message?.content)
     if (!parsed) throw new Error('Meal analysis returned no parsable JSON')
 
+    const items = (Array.isArray(parsed.items) ? parsed.items : [])
+      .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object' && typeof i.name === 'string')
+      .slice(0, 20)
+      .map((i) => ({
+        name: String(i.name).slice(0, 80),
+        portion: typeof i.portion === 'string' ? i.portion.slice(0, 40) : '',
+        calories: Math.round(macro(i.calories)),
+        protein_g: macro(i.protein_g),
+        carbs_g: macro(i.carbs_g),
+        fat_g: macro(i.fat_g),
+      }))
+    const score = Math.round(macro(parsed.score))
+
     return json({
-      items: Array.isArray(parsed.items) ? parsed.items.filter((i): i is string => typeof i === 'string').slice(0, 20) : [],
+      title: typeof parsed.title === 'string' ? parsed.title.slice(0, 60) : '',
+      // Legacy shape (older app builds read `items` as names only).
+      items: items.map((i) => i.name),
+      item_breakdown: items,
       total_calories: Math.round(macro(parsed.total_calories)),
       protein_g: macro(parsed.protein_g),
       carbs_g: macro(parsed.carbs_g),
       fat_g: macro(parsed.fat_g),
       fiber_g: macro(parsed.fiber_g),
+      score: score >= 1 && score <= 10 ? score : null,
+      score_label: typeof parsed.score_label === 'string' ? parsed.score_label.slice(0, 30) : '',
       suggestions: typeof parsed.suggestions === 'string' ? parsed.suggestions.slice(0, 300) : '',
     })
   } catch (e) {

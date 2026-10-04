@@ -1,4 +1,5 @@
 import { Text as RNText, TextProps } from 'react-native'
+import { mergeTextClasses } from '../../lib/utils/classNames'
 
 type TextVariant = 'body' | 'bodyLg' | 'bodySm' | 'caption' | 'label' | 'number' | 'numberLg'
 
@@ -21,7 +22,7 @@ export interface AppTextProps extends TextProps {
 /** Body/UI text on the Barlow family. Defaults to foreground color + body size. */
 export function Text({ variant = 'body', muted, className = '', ...rest }: AppTextProps) {
   const color = muted ? 'text-muted-foreground' : 'text-foreground'
-  return <RNText className={`${VARIANT[variant]} ${color} ${className}`} {...rest} />
+  return <RNText className={mergeTextClasses(`${VARIANT[variant]} ${color}`, className)} {...rest} />
 }
 
 type HeadingLevel = 1 | 2 | 3 | 4
@@ -50,5 +51,5 @@ export function Heading({
 }: HeadingProps) {
   const color = muted ? 'text-muted-foreground' : 'text-foreground'
   const transform = uppercase ? 'uppercase tracking-wide' : ''
-  return <RNText className={`${HEADING[level]} ${color} ${transform} ${className}`} {...rest} />
+  return <RNText className={mergeTextClasses(`${HEADING[level]} ${color} ${transform}`, className)} {...rest} />
 }

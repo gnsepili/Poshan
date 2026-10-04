@@ -34,6 +34,15 @@ export interface Goal {
   created_at: string
 }
 
+export interface MealItem {
+  name: string
+  portion: string
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+}
+
 export interface Meal {
   id: string
   user_id: string
@@ -47,6 +56,11 @@ export interface Meal {
   fat_g: number
   fiber_g: number
   ai_suggestions: string | null
+  /** Per-item breakdown from photo analysis (null for manual/coach-logged meals). */
+  items: MealItem[] | null
+  /** 1-10 meal quality score with a short label, from photo analysis. */
+  score: number | null
+  score_label: string | null
   created_at: string
 }
 

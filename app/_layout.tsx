@@ -1,7 +1,6 @@
 import '../global.css'
 import { useCallback, useEffect, useState } from 'react'
-import { AppState, useColorScheme as useSystemColorScheme } from 'react-native'
-import { useColorScheme as useNativewindColorScheme } from 'nativewind'
+import { AppState } from 'react-native'
 import NetInfo from '@react-native-community/netinfo'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -56,14 +55,6 @@ export default function RootLayout() {
     BarlowCondensed_600SemiBold,
     BarlowCondensed_700Bold,
   })
-
-  // Mirror the OS color scheme into NativeWind (class strategy) so light/dark
-  // tokens switch with the system setting.
-  const systemScheme = useSystemColorScheme()
-  const { setColorScheme } = useNativewindColorScheme()
-  useEffect(() => {
-    setColorScheme(systemScheme === 'dark' ? 'dark' : 'light')
-  }, [systemScheme, setColorScheme])
 
   // Cached data must be loaded before anything fetches fresh data over it.
   useEffect(() => {
@@ -164,8 +155,8 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <SafeAreaProvider>
           <KeyboardProvider>
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(onboarding)" />
             <Stack.Screen name="(tabs)" />
@@ -173,6 +164,8 @@ export default function RootLayout() {
             <Stack.Screen name="activity" />
             <Stack.Screen name="progress" />
             <Stack.Screen name="health-connect" />
+            <Stack.Screen name="meal/new" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="meal/[id]" />
           </Stack>
           </KeyboardProvider>
         </SafeAreaProvider>

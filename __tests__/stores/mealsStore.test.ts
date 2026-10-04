@@ -307,4 +307,23 @@ describe('mealsStore', () => {
     expect(useMealsStore.getState().meals).toEqual([{ id: 'm1' }])
     expect(useMealsStore.getState().error).toMatch(/network/i)
   })
+
+  it('deleteMeal removes the meal from the database and today\'s list', async () => {
+    useMealsStore.setState({ meals: [{ id: 'm1' }, { id: 'm2' }] as never })
+    const eq = jest.fn().mockResolvedValue({ error: null })
+    const del = jest.fn().mockReturnValue({ eq })
+    ;(supabase.from as jest.Mock).mockReturnValue({ delete: del })
+    await expect(useMealsStore.getState().deleteMeal('m1')).resolves.toBe(true)
+    expect(eq).toHaveBeenCalledWith('id', 'm1')
+    expect(useMealsStore.getState().meals.map((m) => m.id)).toEqual(['m2'])
+  })
+
+  it('deleteMeal keeps the meal and reports the error when the delete fails', async () => {
+    useMealsStore.setState({ meals: [{ id: 'm1' }] as never })
+    const eq = jest.fn().mockResolvedValue({ error: { message: 'nope' } })
+    ;(supabase.from as jest.Mock).mockReturnValue({ delete: jest.fn().mockReturnValue({ eq }) })
+    await expect(useMealsStore.getState().deleteMeal('m1')).resolves.toBe(false)
+    expect(useMealsStore.getState().meals).toHaveLength(1)
+    expect(useMealsStore.getState().error).toBe('nope')
+  })
 })

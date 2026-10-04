@@ -1,5 +1,28 @@
 # Poshan AI — Design System (MASTER)
 
+> **Current direction (2026-10-04): "Night training" — dark-only.** Supersedes the light/dark
+> Energetic Fitness palette below where they conflict (the type scale, component APIs and
+> principles still apply).
+>
+> - **Canvas:** true black `#000000`; cards `#121214`, borderless, radius 20–28; inputs/chips `#1A1A1D`.
+> - **One colour per metric, everywhere:** calories `#FF7A1A`, protein `#A3E635`, carbs `#38BDF8`,
+>   fat `#A78BFA`, steps `#F472B6` — each with a dim `-soft` track shade for rings/bars
+>   (`macro-*` / `macro-*-soft` classes, `macro*` in `lib/theme.ts`). Brand green `#10B981` = primary
+>   action + coach; accent orange = high-intent snap/log.
+> - **Type:** scale is one step up from Tailwind defaults (body 17, small 15, caption 13). Hero numbers
+>   use `font-display` (Barlow Condensed) 24–48px. `Text`/`Heading` let an explicit font/size/colour class
+>   replace the variant default (`lib/utils/classNames.ts`).
+> - **Motion (`components/motion`):** `ActivityRings`/`AnimatedRing` sweep in, `CountUp` numbers,
+>   `FadeIn` staggered entrances, `PressableScale` (spring + light haptic), `Skeleton`, `SuccessBurst`.
+>   All respect reduce-motion. NativeWind classes do **not** apply to Reanimated `Animated.View` — put
+>   classes on an inner `View` and keep animated views style-only.
+> - **Navigation:** tabs Home · Plans · Snap (raised camera → `/meal/new`) · Coach · Profile.
+>   Home owns today's meals; `/meal/[id]` shows a logged meal in the same `MealResult` view.
+> - **Dev preview:** `/design-preview` (dev builds only) renders the key components with sample data.
+
+---
+
+
 > Source of truth for the UI revamp. Direction: **Energetic Fitness** — bold,
 > motivational, athletic. Flat design, high energy, green + macro-orange.
 > Light + dark, driven by the system color scheme.

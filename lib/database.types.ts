@@ -374,10 +374,13 @@ export type Database = {
           fat_g: number
           fiber_g: number
           id: string
+          items: Json | null
           logged_at: string
           meal_type: string
           photo_url: string | null
           protein_g: number
+          score: number | null
+          score_label: string | null
           total_calories: number
           user_id: string
         }
@@ -389,10 +392,13 @@ export type Database = {
           fat_g?: number
           fiber_g?: number
           id?: string
+          items?: Json | null
           logged_at?: string
           meal_type: string
           photo_url?: string | null
           protein_g?: number
+          score?: number | null
+          score_label?: string | null
           total_calories?: number
           user_id: string
         }
@@ -404,10 +410,13 @@ export type Database = {
           fat_g?: number
           fiber_g?: number
           id?: string
+          items?: Json | null
           logged_at?: string
           meal_type?: string
           photo_url?: string | null
           protein_g?: number
+          score?: number | null
+          score_label?: string | null
           total_calories?: number
           user_id?: string
         }

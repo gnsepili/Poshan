@@ -4,8 +4,8 @@ const token = (name) => `rgb(var(--${name}) / <alpha-value>)`
 module.exports = {
   content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
-  // Class strategy: we mirror the system scheme into NativeWind in app/_layout.
-  // (The 'media' strategy crashes NativeWind's web runtime on initial load.)
+  // The app is dark-only: tokens in global.css hold the dark values directly, so no
+  // `dark:` variants are used. (Class strategy kept: 'media' crashes NativeWind on web.)
   darkMode: 'class',
   theme: {
     extend: {
@@ -44,10 +44,16 @@ module.exports = {
         },
         info: token('info'),
         macro: {
-          protein: token('macro-protein'),
-          carbs: token('macro-carbs'),
-          fat: token('macro-fat'),
           calories: token('macro-calories'),
+          'calories-soft': token('macro-calories-soft'),
+          protein: token('macro-protein'),
+          'protein-soft': token('macro-protein-soft'),
+          carbs: token('macro-carbs'),
+          'carbs-soft': token('macro-carbs-soft'),
+          fat: token('macro-fat'),
+          'fat-soft': token('macro-fat-soft'),
+          steps: token('macro-steps'),
+          'steps-soft': token('macro-steps-soft'),
         },
       },
       // One step larger than Tailwind's defaults: testers found the app's type small next

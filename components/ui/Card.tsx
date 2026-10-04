@@ -1,14 +1,10 @@
 import { Pressable, PressableProps, View, ViewProps } from 'react-native'
 
-const BASE = 'bg-surface rounded-2xl border border-border'
+// Flat near-black tiles on the black canvas: no borders, no shadows.
+const BASE = 'bg-surface rounded-2xl'
 
-const ELEVATED_STYLE = {
-  shadowColor: '#0B1210',
-  shadowOpacity: 0.06,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 2,
-}
+// Kept for API compatibility; on a black canvas elevation reads as a slightly lighter tile.
+const ELEVATED_STYLE = { backgroundColor: '#18181B' }
 
 export interface CardProps extends ViewProps {
   elevated?: boolean

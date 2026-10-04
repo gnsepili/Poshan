@@ -1,7 +1,14 @@
 import { invokeEdgeFunction } from './edgeFunction'
+import { MealItem } from '../../types'
 
 export interface MealAnalysisResult {
+  /** Short name for the whole meal. */
+  title: string
+  /** Item names only (legacy). */
   items: string[]
+  item_breakdown: MealItem[]
+  score: number | null
+  score_label: string
   total_calories: number
   protein_g: number
   carbs_g: number

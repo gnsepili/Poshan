@@ -1,77 +1,50 @@
-import { useColorScheme } from 'react-native'
-
 /*
- * Resolved color values for contexts that can't use Tailwind classNames —
- * react-native-svg (rings, charts), the tab bar tint, StatusBar, etc.
- * Keep these in sync with the CSS variables in global.css.
+ * Resolved colour values for contexts that can't use Tailwind classNames —
+ * react-native-svg (rings, charts), the tab bar, StatusBar, etc.
+ * The app is dark-only; keep these in sync with the CSS variables in global.css.
  */
-const light = {
-  background: '#F5F6F4',
-  // (string-typed on purpose so the dark map can hold different values)
-  surface: '#FFFFFF',
-  surfaceMuted: '#F0F2EE',
-  surfaceStrong: '#111814',
-  foreground: '#0B1210',
-  mutedForeground: '#5B646C',
-  onSurfaceStrong: '#F5F7F5',
-  border: '#E4E7E2',
-  borderStrong: '#CBD0C9',
-  ring: '#059669',
-  primary: '#059669',
-  primaryPressed: '#047857',
-  primarySoft: '#D1FAE5',
-  onPrimary: '#FFFFFF',
-  accent: '#EA580C',
-  accentPressed: '#C2410C',
-  accentSoft: '#FFEDD5',
-  onAccent: '#FFFFFF',
-  success: '#16A34A',
-  warning: '#D97706',
-  danger: '#DC2626',
-  info: '#2563EB',
-  macroProtein: '#059669',
-  macroCarbs: '#F59E0B',
-  macroFat: '#8B5CF6',
-  macroCalories: '#EA580C',
-}
-
-const dark: typeof light = {
-  background: '#0B0F0E',
-  surface: '#15191A',
-  surfaceMuted: '#1C2122',
-  surfaceStrong: '#050A08',
-  foreground: '#F2F5F3',
-  mutedForeground: '#9BA69F',
-  onSurfaceStrong: '#F2F5F3',
-  border: '#272D2B',
-  borderStrong: '#373E3B',
+const palette = {
+  background: '#000000',
+  surface: '#121214',
+  surfaceMuted: '#1A1A1D',
+  surfaceStrong: '#0A0A0B',
+  foreground: '#F5F5F5',
+  mutedForeground: '#9A9AA0',
+  onSurfaceStrong: '#F5F5F5',
+  border: '#1F1F22',
+  borderStrong: '#2A2A2E',
   ring: '#10B981',
   primary: '#10B981',
   primaryPressed: '#059669',
-  primarySoft: '#06281F',
-  onPrimary: '#06140F',
-  accent: '#F97316',
-  accentPressed: '#EA580C',
-  accentSoft: '#2B170A',
-  onAccent: '#0A0603',
-  success: '#22C55E',
-  warning: '#F59E0B',
+  primarySoft: '#0F2E22',
+  onPrimary: '#04130D',
+  accent: '#FF7A1A',
+  accentPressed: '#EA620C',
+  accentSoft: '#3A1F0D',
+  onAccent: '#140800',
+  success: '#34D399',
+  warning: '#FBBF24',
   danger: '#F87171',
-  info: '#60A5FA',
-  macroProtein: '#10B981',
-  macroCarbs: '#FBBF24',
+  info: '#38BDF8',
+  macroCalories: '#FF7A1A',
+  macroCaloriesSoft: '#3A1F0D',
+  macroProtein: '#A3E635',
+  macroProteinSoft: '#26330F',
+  macroCarbs: '#38BDF8',
+  macroCarbsSoft: '#0D2A38',
   macroFat: '#A78BFA',
-  macroCalories: '#F97316',
+  macroFatSoft: '#241C3D',
+  macroSteps: '#F472B6',
+  macroStepsSoft: '#3A1428',
 }
 
-export type ThemeColors = typeof light
+export type ThemeColors = typeof palette
 
-export function getThemeColors(scheme: string | null | undefined): ThemeColors {
-  return scheme === 'dark' ? dark : light
+export function getThemeColors(): ThemeColors {
+  return palette
 }
 
-/** Resolved color palette for the active system color scheme. */
+/** The app's (dark-only) colour palette for SVG and native props. */
 export function useThemeColors(): ThemeColors {
-  const scheme = useColorScheme()
-  return getThemeColors(scheme)
+  return palette
 }

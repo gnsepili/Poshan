@@ -1,17 +1,29 @@
-import { Tabs } from 'expo-router'
-import { Platform } from 'react-native'
-import {
-  Home,
-  UtensilsCrossed,
-  ClipboardList,
-  MessageCircle,
-  Settings,
-} from 'lucide-react-native'
-import { useMealsStore } from '../../stores/mealsStore'
+import { Tabs, useRouter } from 'expo-router'
+import { Platform, View } from 'react-native'
+import { Home, ClipboardList, Camera, MessageCircle, User } from 'lucide-react-native'
+import { PressableScale } from '../../components/motion'
 import { useThemeColors } from '../../lib/theme'
 
+// Raised orange camera button in the middle of the tab bar.
+function SnapButton() {
+  const router = useRouter()
+  const colors = useThemeColors()
+  return (
+    <View className="flex-1 items-center">
+      <PressableScale
+        onPress={() => router.push('/meal/new')}
+        accessibilityRole="button"
+        accessibilityLabel="Snap a meal"
+        className="h-14 w-14 rounded-full items-center justify-center -mt-5"
+        style={{ backgroundColor: colors.accent }}
+      >
+        <Camera size={26} color={colors.onAccent} />
+      </PressableScale>
+    </View>
+  )
+}
+
 export default function TabsLayout() {
-  const pendingCount = useMealsStore((s) => s.pendingCount)
   const colors = useThemeColors()
 
   return (
@@ -22,10 +34,10 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: colors.background,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 86 : 64,
+          height: Platform.OS === 'ios' ? 86 : 66,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
         },
         tabBarLabelStyle: {
@@ -43,19 +55,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="meals"
-        options={{
-          title: 'Meals',
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.onAccent },
-          tabBarIcon: ({ color, size }) => <UtensilsCrossed color={color} size={size ?? 24} />,
-        }}
-      />
-      <Tabs.Screen
         name="plans"
         options={{
           title: 'Plans',
           tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size ?? 24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="snap"
+        options={{
+          title: 'Snap',
+          tabBarButton: () => <SnapButton />,
         }}
       />
       <Tabs.Screen
@@ -66,10 +76,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size ?? 24} />,
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => <User color={color} size={size ?? 24} />,
         }}
       />
     </Tabs>
