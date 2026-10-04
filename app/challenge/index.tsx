@@ -28,7 +28,9 @@ function confirm(title: string, message: string, onYes: () => void) {
   ])
 }
 
-function CheckRow({ label, hint, done, auto, onPress, color }: { label: string; hint: string; done: boolean; auto: boolean; onPress?: () => void; color: string }) {
+// `dimWhenDone`: on the daily checklist a finished rule fades; when picking rules, a
+// selected rule must stay bright (it means "included", not "finished").
+function CheckRow({ label, hint, done, auto, onPress, color, dimWhenDone = true }: { label: string; hint: string; done: boolean; auto: boolean; onPress?: () => void; color: string; dimWhenDone?: boolean }) {
   return (
     <PressableScale
       onPress={onPress}
@@ -45,7 +47,7 @@ function CheckRow({ label, hint, done, auto, onPress, color }: { label: string; 
         {done ? <Check size={16} color="#04121A" strokeWidth={3} /> : null}
       </View>
       <View className="flex-1">
-        <Text variant="body" className={done ? 'text-muted-foreground' : 'text-foreground'}>{label}</Text>
+        <Text variant="body" className={done && dimWhenDone ? 'text-muted-foreground' : 'text-foreground'}>{label}</Text>
         <Text variant="caption" muted>{hint}</Text>
       </View>
       {auto ? <Text variant="caption" style={{ color }}>auto</Text> : null}
@@ -102,7 +104,7 @@ function JoinView() {
             {kind === 'auto' ? 'Tracked automatically' : 'Daily check-ins'}
           </Text>
           {RULES.filter((r) => r.kind === kind).map((r) => (
-            <CheckRow key={r.id} label={r.label} hint={r.hint} done={rules.includes(r.id)} auto={false} onPress={() => toggle(r.id)} color={colors.arc} />
+            <CheckRow key={r.id} label={r.label} hint={r.hint} done={rules.includes(r.id)} auto={false} dimWhenDone={false} onPress={() => toggle(r.id)} color={colors.arc} />
           ))}
         </FadeIn>
       ))}
