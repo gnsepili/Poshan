@@ -1,4 +1,5 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { mealLogRejection, upsertPlanDay, weekStartMonday, weekdayName } from './mealGuards.ts'
 
 // OpenAI function-calling tool definitions
 export const TOOL_DEFINITIONS = [
@@ -6,11 +7,13 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'log_meal',
-      description: 'Log a meal the user just ate, with its estimated macros. Use this when the user describes food they ate.',
+      description:
+        "Record ONE meal the user has ALREADY EATEN (past tense: 'I had', 'I just ate'), with estimated macros. NEVER use it for plans, intentions or questions ('I'm planning to have', 'what should I eat', 'suggest a meal') — use plan_meals_for_day or just answer. If it's unclear whether they ate it, ask first. One call per meal.",
       parameters: {
         type: 'object',
         properties: {
-          description: { type: 'string', description: 'Text description of the meal' },
+          user_confirmed_eaten: { type: 'boolean', description: 'true only if the user said they already ate this' },
+          description: { type: 'string', description: 'Text description of the single meal' },
           meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
           total_calories: { type: 'number' },
           protein_g: { type: 'number' },
@@ -18,7 +21,37 @@ export const TOOL_DEFINITIONS = [
           fat_g: { type: 'number' },
           fiber_g: { type: 'number' },
         },
-        required: ['description', 'meal_type', 'total_calories', 'protein_g', 'carbs_g', 'fat_g'],
+        required: ['user_confirmed_eaten', 'description', 'meal_type', 'total_calories', 'protein_g', 'carbs_g', 'fat_g'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'plan_meals_for_day',
+      description:
+        "Save a meal plan for ONE day (what the user intends to eat, or what you recommend) into their weekly meal plan in the Plans tab. This does NOT log anything as eaten. Use it when the user describes what they plan to eat or asks you to plan a day; fit it to their protein and macro targets.",
+      parameters: {
+        type: 'object',
+        properties: {
+          day: { type: 'string', description: 'Weekday name, e.g. "Monday"; defaults to today' },
+          meals: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+                description: { type: 'string', description: 'Foods and portions, e.g. "2 whole eggs + 4 egg whites, scrambled"' },
+                calories: { type: 'number' },
+                protein_g: { type: 'number' },
+                carbs_g: { type: 'number' },
+                fat_g: { type: 'number' },
+              },
+              required: ['meal_type', 'description', 'calories', 'protein_g', 'carbs_g', 'fat_g'],
+            },
+          },
+        },
+        required: ['meals'],
       },
     },
   },
@@ -231,6 +264,8 @@ export async function executeTool(
   supabase: SupabaseClient
 ): Promise<string> {
   if (name === 'log_meal') {
+    const refusal = mealLogRejection(input)
+    if (refusal) return refusal
     const { error } = await supabase.from('meals').insert({
       user_id: userId,
       meal_type: input.meal_type,
@@ -244,6 +279,40 @@ export async function executeTool(
     })
     if (error) return `Error logging meal: ${error.message}`
     return `Meal logged: ${input.description} — ${input.total_calories} kcal, ${input.protein_g}g protein, ${input.carbs_g}g carbs, ${input.fat_g}g fat`
+  }
+
+  if (name === 'plan_meals_for_day') {
+    const meals = (Array.isArray(input.meals) ? input.meals : [])
+      .filter((m): m is Record<string, unknown> => !!m && typeof m === 'object' && typeof (m as { description?: unknown }).description === 'string')
+      .slice(0, 8)
+      .map((m) => ({
+        meal_type: ['breakfast', 'lunch', 'dinner', 'snack'].includes(m.meal_type as string) ? m.meal_type : 'snack',
+        description: String(m.description).slice(0, 200),
+        calories: Math.max(0, Math.round(Number(m.calories) || 0)),
+        protein_g: Math.max(0, Math.round(Number(m.protein_g) || 0)),
+        carbs_g: Math.max(0, Math.round(Number(m.carbs_g) || 0)),
+        fat_g: Math.max(0, Math.round(Number(m.fat_g) || 0)),
+      }))
+    if (meals.length === 0) return 'Error: provide at least one meal with a description and macros.'
+    const day = weekdayName(typeof input.day === 'string' ? input.day : undefined)
+    const weekStart = weekStartMonday()
+    // Merge into this week's plan (latest wins); create it if there isn't one yet.
+    const { data: existing } = await supabase
+      .from('meal_plans')
+      .select('id, plan_json')
+      .eq('user_id', userId)
+      .eq('week_start_date', weekStart)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const days = upsertPlanDay(Array.isArray(existing?.plan_json?.days) ? existing!.plan_json.days : [], { day, meals })
+    const { error } = existing
+      ? await supabase.from('meal_plans').update({ plan_json: { ...existing.plan_json, days } }).eq('id', existing.id)
+      : await supabase.from('meal_plans').insert({ user_id: userId, week_start_date: weekStart, plan_json: { days } })
+    if (error) return `Error saving the plan: ${error.message}`
+    const kcal = meals.reduce((n, m) => n + m.calories, 0)
+    const protein = meals.reduce((n, m) => n + m.protein_g, 0)
+    return `Saved ${day}'s meal plan (${meals.length} meals, ~${kcal} kcal, ${protein}g protein) in Plans → Meals. Nothing was logged as eaten — the user logs meals as they have them.`
   }
 
   if (name === 'get_daily_summary') {

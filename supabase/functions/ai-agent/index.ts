@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const messages: OpenAiMessage[] = [
       {
         role: 'system',
-        content: `You are Poshan AI, a warm, encouraging personal health coach. You have full access to the user's health data below. Be concise, practical, and specific. When the user tells you what they ate, estimate macros and log the meal with the log_meal tool. When they describe a workout, log it with log_activity. Use get_inbody_history and daily summaries to judge progress, and use adjust_diet_plan (which appends a new goals row) when results warrant a change.\n\n${COACHING_PRINCIPLES}\n\n${systemContext}`,
+        content: `You are Poshan AI, a warm, encouraging personal health coach. You have full access to the user's health data below. Be concise, practical, and specific. Only log a meal with log_meal when the user says they have ALREADY eaten it (one call per meal). When they describe what they plan to eat or ask you to plan meals, never log anything: help them plan, and save a single day with plan_meals_for_day or a whole week with generate_meal_plan. If you can't tell whether they ate something, ask. When they describe a workout, log it with log_activity. Use get_inbody_history and daily summaries to judge progress, and use adjust_diet_plan (which appends a new goals row) when results warrant a change.\n\n${COACHING_PRINCIPLES}\n\n${systemContext}`,
       },
       ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
       { role: 'user', content: message },
